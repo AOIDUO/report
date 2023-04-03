@@ -118,14 +118,122 @@ Marisa Kirisame
 \chapter{Introduction}
 \label{sec:introduction}
 
+MLIR, Multi-Level Intermediate Representation, is a infrastructure for building
+reusable and extensible compilers. Its aim is to reduce fragmentation in domain
+specific languages and heterogeneous hardwares \cite{mlir}. Its Presburger
+library provides polyhedral compilation techniques to make dependence analysis
+and loop optimization \cite{mliraffine} and cache modeling \cite{CacheModel}.
+Presburger arithmetics involves determining whether conjunction of linear
+arithmetic constraints is satisfiable \cite{SMLPPA}, and can be solved using the
+simplex method of linear programming, with its core function "pivot" consumes
+\hl{TODO: find the number} \% \cite{FPL1} of the runtime. 
 
-\begin{verbatim}
-\begin{preliminary}
-    ...
-\end{preliminary}
-\end{verbatim}
+The \texttt{pivot} function involves two multiplication and one addition
+operation on every element in a matrix. Notably, the input matrices for this
+library tend to exhibit characteristics of small values and low dimensionality.
+For example, 90\% of test cases work with 16-bit integers that never overflow,
+and 74\% of isl’s runtime is spent on test cases that we can compute using
+16-bit integers and matrices with at most 32 columns \cite{FPL2}. These
+properties can be leveraged to take advantage from modern micro-architectural
+hardware resources, thereby accelerating the process.
+
+Currently, the source code in MLIR upstream adopts a nested for-loop to iterate
+through every element of the matrix in a transprecision manner. Each number in
+the matrix can either be \texttt{int64\_t} or \texttt{LargeInteger}. The
+algorithm starts by using \texttt{int64\_t}, in case of overflow, it switches to
+the \texttt{LargeInteger} version. This approach is computationally expensive
+and inefficient, for the following reasons: 
+\begin{enumerate}
+
+\item \texttt{int64\_t} has a much larger bit width than what is typically
+used for most of the elements in the matrix,
+
+\item the compiler is not capable of automatically generating vectorized
+instructions to further optimize the process,
+
+\item overflow is checked manually through additional arithmetic
+operations.
+
+\end{enumerate}
+
+To propose a faster alternative of the \texttt{pivot} function, we could
+consider constructing a new \texttt{pivot} algorithm that satisfies the
+following conditions:
+\begin{enumerate}
+
+\item Utilize SIMD: preliminary benchmarks (see Section \ref{sec:todo}) indicate
+8x \hl{TODO: verify this number} performance improvement on a simple vector
+element-wise add example. 
+
+\item Use small bit width for every element: reducing bit width by half doubles the
+amount of numbers packed into a single vector register, and essentially reduces
+the instruction count by half.  \hl{(Some figure TODO)}
+
+\item Fast overflow checking: for integers, overflow has to be checked manually
+and this introduces 60\%  \hl{(TODO: verify this number?)} overhead, as
+benchmarks in the Section \ref{sec:todo} shown. This is because the x86
+architecture does not provide status registers to indicate integer overflown.
+However, there is one for floating points, making floating points overflow
+detection almost free. 
+
+\end{enumerate}
+
+
+opencompl’s fork of LLVM includes a modified version of \texttt{pivot} that
+utilizes \texttt{int16\_t} and is designed for matrices with 32 columns or less \cite{FPL2}.
+This approach offers the advantage of being able to pack a row of 32 elements
+into a single \texttt{AVX-512} register and addresses issues 1 and 2. However,
+overflow is still checked manually, causing 4x or 5x more instruction count (
+Section \ref{sec:todo}). Moreover, this approach introduces a new disadvantage,
+the support for vectorized \texttt{int16\_t} is very rare among CPU manufactured
+in the last decade (Section \ref{sec:todo}). 
+
+An alternative approach is to do 23-bit or 52-bit integer operations using float
+(32-bit floating point) or double (64-bit floating point) respectively. Though
+floating points are notorious for precision issues, they are reliable when
+representing integers that fit inside their mantissa, 23 bits for float and 52
+bits for double \footnote{ IEEE 754 specification is introduced in Section
+\ref{sec:todo}}. When the result of some integer computation exceeds the bit
+size of the mantissa, floating point imprecision almost always occurs and a
+status register will be set automatically (Section \ref{sec:todo}). Comparing to
+\texttt{int16\_t}, even though vector size is sacrificed as there does not exist
+support for 16-bit floating point \texttt{half}, using floating points could
+still potentially be faster, because overflow checking overhead can be
+significantly reduced. With floating points, the cost of overflow checking is
+the time spent on resetting the status register once at the beginning of a
+sequence calls to `pivot`, plus reading it, per \texttt{pivot} call. Benchmarks
+\hl{TODO: some figure} indicate that the total overhead is as low as 1 ns, as it
+only adds 1 ns to read the status register in the instruction execution
+pipeline, and the average cost of resetting per pivot is negligible. 
+
+This report will first analyze the capability of modern CPU micro-architecture
+under various configurations such as vectorization method (clang automatic from
+scalar code, AVX intrinsic, clang builtin vector type), matrix data structure
+(nested list or flat list), and element data type (int16, int32, int64, float,
+double), through a matrix element-wise fused-multiply-add toy example and a copy
+of the pivot function detached from the Presburger library. 
+\hl{TODO: Fix this paragraph}
+
+
+Then we conclude that AVX intrinsic with clang builtin vector type and flat list
+matrix is superior to their counterpart. With overflow ignored, int16 is the
+fastest, but floating points are faster when overflow checking is turned on. The
+most optimal configuration takes 20 ns to finish pivot on a representative and
+general case input matrix of 30 rows by 16 columns, achieving 30x faster than
+the upstream version.  
+
+\hl{TODO: Update here after Integrating into library}
+
+
 
 \chapter{Background}
+\section{Modern CPU micro-architecture}
+\section{code block example}
+\begin{verbatim}
+    \begin{preliminary}
+        ...
+    \end{preliminary}
+\end{verbatim}
 
 \section{Modern CPU micro-architecture}
 
