@@ -5,6 +5,7 @@
 \usepackage{ugcheck}
 \newcommand{\todo}{\textbf{?} }
 \usepackage{color,soul}
+% \usepackage{hyperref}
 
 % Include any packages you need below, but don't include any that change the page
 % layout or style of the dissertation. By including the ugcheck package above,
@@ -43,21 +44,45 @@
 \date{\today}
 
 \abstract{
+\label{sec:abstract}
 
-MLIR provides a presburger library that helps cache analysis and loop optimization. This library uses linear programming of simplex method and a core function is pivot, it performs two multiplication and one addition to every elements in a matrix. The input matrics have these characteristics: small value, low dimensionality and high sparsity. We can exploits these features and utilize modern micro-architectural-level hardware resources to accelerate the process. 
+This report presents a faster implementation for the core \texttt{pivot}
+function of MLIR’s presburger library. Its hot loop is element-wise
+overflow-checked multiplication and addition on an input matrix of low dimension
+and mostly small value elements. 
 
-The current source code in MLIR is a nested for-loop iterating every number in the matrix in a transprecision manner, where each number can be \texttt{int64\_t} or \texttt{LargeInteger}. If overflow occurs when using \texttt{int64\_t}, the algorithm will be redirected to \texttt{LargeInteger}. A better implementation is to have 3 layers of transprecision: (1) manually-vectorized \texttt{int16\_t}, 
-(2) manually-vectorized 52-bits integer (\texttt{int52\_t}) represented using \texttt{double} and (3) \texttt{LargeInteger}.
+The current approach of upstream is element-wise multiplication and addition  on
+transprecision integer matrices, from \texttt{int64\_t} to
+\texttt{LargeInteger}. This can be improved by efficiently utilizing hardware
+resources, taking advantage of SIMD, and reducing the bit width for every
+element: the compiler is not capable of automatically generating vectorized
+instructions for element-wise transprecision computing, and \texttt{int64\_t}
+has a much larger bit width than what is typically used for most of the elements
+in the matrix. Additionally, extra arithmetics are required to perform overflow
+checking for \texttt{int64\_t}, resulting in significant performance overhead.
+This report “innovates” the \texttt{int23\_t} \footnote{This is not really a
+innovation. It it a common technique on GPUs because often they are more capable
+on floating points than integers. See Section \ref{sec:introduction} for more
+history and detail. } datatype, a 23-bit integer datatype that utilizes the
+23-bit mantissa of a 32-bit floating point, to address these issues. The faster
+“pivot” performs matrix-wise transprecision computing, targeting 99\% \hl{TODO:
+confirm this number} of the case where elements fit inside \texttt{int23\_t}.
+Overflow awareness overhead is almost free, as floating point imprecision
+implies \texttt{int23\_t} overflow (See Section \ref{sec:todo}) and can be
+captured by a status register. It takes as low as 1 ns to check the status
+register in the pipeline, and only takes 9 ns to reset the status register.
+Additionally the status register is only cleared once before a sequence of
+\texttt{pivot} calls, making the average cost of clearing the status register
+per \texttt{pivot} negligible.  
+    
+On a 30-row by 16-column example matrix, it performs 30 times faster than the
+upstream scalar implementation. The time cost of a single \texttt{pivot} call is
+reduced from 550 ns to 18.6 ns. \hl{TODO: replace this with actual MLIR benchmark
+result}
 
-\footnotesize
-\hl{Maybe explain reason for these choice?
-Say how to do overflow check: int16 use saturated add, int52 use SIGFPE
+\hl{TODO:Question: mention int16 here?}
 
-Another question: how detail should abstract be?
-}
-\normalsize
-
-It is expected to have 4x\todo and 8x\todo performance improvement by vectorizing it and by introducing \texttt{int16\_t} respectively. In practice the performance of the test has been increased by \todo and the \texttt{pivot} function is \todo x faster. 
+\hl{TODO:Reminder: we don't use int16 for (1) compatibility (2) slightly faster than float}
 
 }
 
@@ -68,21 +93,7 @@ It is expected to have 4x\todo and 8x\todo performance improvement by vectorizin
    {\end{frontenv}\newpage}
 
 \begin{ethics}
-\textbf{Instructions:} \emph{Agree with your supervisor which
-statement you need to include. Then delete the statement that you are not using,
-and the instructions in italics.\\
-\textbf{Either complete and include this statement:}}\\ % DELETE THESE INSTRUCTIONS
-%
-% IF ETHICS APPROVAL WAS REQUIRED:
-This project obtained approval from the Informatics Research Ethics committee.\\
-Ethics application number: ???\\
-Date when approval was obtained: YYYY-MM-DD\\
-%
-\emph{[If the project required human participants, edit as appropriate, otherwise delete:]}\\ % DELETE THIS LINE
-The participants' information sheet and a consent form are included in the appendix.\\
-%
-% IF ETHICS APPROVAL WAS NOT REQUIRED:
-\textbf{\emph{Or include this statement:}}\\ % DELETE THIS LINE
+
 This project was planned in accordance with the Informatics Research
 Ethics policy. It did not involve any aspects that required approval
 from the Informatics Research Ethics committee.
@@ -93,6 +104,10 @@ from the Informatics Research Ethics committee.
 
 \begin{acknowledgements}
 Any acknowledgements go here.
+
+\hl{TODO:}
+Marisa Kirisame 
+
 \end{acknowledgements}
 
 
@@ -101,6 +116,7 @@ Any acknowledgements go here.
 
 
 \chapter{Introduction}
+\label{sec:introduction}
 
 
 \begin{verbatim}
@@ -109,6 +125,7 @@ Any acknowledgements go here.
 \end{preliminary}
 \end{verbatim}
 
+\chapter{Background}
 
 \section{Modern CPU micro-architecture}
 
