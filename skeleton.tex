@@ -344,26 +344,23 @@ faster if the additional AVX-512 is disabled (and does not thermal throttle)
 AMD’s implementation of AVX-512 in Zen4 has slightly less computing power, but
 much more efficient. Zen4 can be considered as modernized version of Zen3 or
 Zen2, where Zen2 and Zen3 supports AVX2 by providing 2 FADD units
-\footnote{Floating-point add units (FADD) can to do addition only. They may be 
-considered as simplified FMA} 
-and 2 FMA units of 256-bit width.
-Zen4 merges these existing circuits to create a single 512-bit FADD
-and single
-512-bit FMA, without introducing any new execution units. Zen3 is reputable for
-its high performance per watt (evidence: my experience), and it is expected to
-be better on zen4 with more advanced lithography. Benchmarks indicate that this
-design indeed does not cause throttling in AVX-512 workloads.
-% (https://www.anandtech.com/show/14514/examining-intels-ice-lake-microarchitecture-and-sunny-cove/12#:~:text=2%20%2B%201-,AVX%2D512,-%2D)
-% This indicates that it is worthwhile to add software support to AVX-512 and
-% gain actual performance increments. 
+\footnote{Floating-point add units (FADD) can execute addition instructions
+only. They may be considered as simplified FMA} and 2 FMA units of 256-bit width
+\cite{Zen2ChipWiki}. Zen4 "double-pumps" these existing circuits to create a
+single 512-bit FADD and a single 512-bit FMA, without introducing any new
+execution units for floating point arithmetic \cite{Zen4Critique}. Zen2 and Zen3
+are reputable for its high performance per watt \cite{ZenPerfPerWatt}, and it is
+expected to be better on zen4 with more advanced lithography. Benchmarks
+(\hl{TODO Some section}) indicate that this design indeed does not cause
+throttling in AVX-512 workloads \cite{Zen4Critique}.
 
-% Another benefit of AVX-512 is that it reduces front-end pressure. In the case
-% of Zen4 microarchitecture, though the back-end is possible to sustain 2 x
-% AVX-2 FADD and 2 x AVX-2 FMA every cycle, the front-end has to dispatch 4
-% instructions per cycle, which is quite difficult. With AVX-512 it only
-% requires 2 instructions to saturate the backend, this is more likely to be
-% achievable in a real-world workload.
-% (https://www.mersenneforum.org/showthread.php?p=614191)
+Additionally, rebuilding existing software to target AVX-512 may bring slight
+performance improvement. One benefit of AVX-512 is that it reduces front-end
+pressure. In the case of Zen4 micro-architecture, though the back-end is
+possible to commit 2 AVX-2 FADD and 2 AVX-2 FMA every cycle, the front-end
+has to dispatch 4 instructions per cycle, which is quite difficult. The
+equivalency in AVX-512 only takes 2 instructions, this is much more likely to be
+sustained by the frontend \cite{Zen4Critique}.
 
 
 \section{``\texttt{int23\_t}''}
