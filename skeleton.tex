@@ -6,6 +6,16 @@
 \newcommand{\todo}{\textbf{?} }
 \usepackage{color,soul}
 % \usepackage{hyperref}
+\usepackage{graphicx}
+
+
+\newenvironment{compactlist}
+{ \begin{enumerate}
+    \setlength{\itemsep}{0pt}
+    \setlength{\parskip}{0pt}
+    \setlength{\parsep}{0pt}     
+}
+{ \end{enumerate} } 
 
 % Include any packages you need below, but don't include any that change the page
 % layout or style of the dissertation. By including the ugcheck package above,
@@ -206,27 +216,98 @@ sequence calls to `pivot`, plus reading it, per \texttt{pivot} call. Benchmarks
 only adds 1 ns to read the status register in the instruction execution
 pipeline, and the average cost of resetting per pivot is negligible. 
 
-This report will first analyze the capability of modern CPU micro-architecture
-under various configurations such as vectorization method (clang automatic from
-scalar code, AVX intrinsic, clang builtin vector type), matrix data structure
-(nested list or flat list), and element data type (int16, int32, int64, float,
-double), through a matrix element-wise fused-multiply-add toy example and a copy
-of the pivot function detached from the Presburger library. 
-\hl{TODO: Fix this paragraph}
+This report will first analyze the capability of modern CPU micro-architecture,
+especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
+example under the following configurations:
 
+\begin{compactlist} 
+    \item Vectorization method 
+        \begin{compactlist} 
+            \item Clang's automatic vectorization from scalar code
+            \item Clang builtin vector datatype with occasional AVX intrinsics 
+        \end{compactlist}
+    \item Matrix data structure 
+        \begin{compactlist} 
+            \item Nested list
+            \item Flat list
+        \end{compactlist}
+    \item Element data type 
+        \begin{compactlist} 
+            \item Integer
+            \item Floating point
+        \end{compactlist}
+    \item Element data width
+        \begin{compactlist} 
+            \item 16 bits: \texttt{int16\_t}
+            \item 32 bits: \texttt{int32\_t}, \texttt{float}
+            \item 64 bits: \texttt{int64\_t}, \texttt{double}
+        \end{compactlist}
+\end{compactlist}
 
-Then we conclude that AVX intrinsic with clang builtin vector type and flat list
-matrix is superior to their counterpart. With overflow ignored, int16 is the
-fastest, but floating points are faster when overflow checking is turned on. The
-most optimal configuration takes 20 ns to finish pivot on a representative and
-general case input matrix of 30 rows by 16 columns, achieving 30x faster than
-the upstream version.  
+It is discovered that clang builtin vector datatype and flat list data structure
+is faster than their counterpart. However, it is quite difficult to decide
+whether \texttt{int16\_t} or \texttt{float} is better, because the former
+benefits form bigger vector size and less instruction count, while the latter
+has minimal overhead on overflow checking. 
+
+Then two detached versions of \texttt{pivot} function from the Presburger
+library are built from the most optimal configurations derived form the toy
+example, one using \texttt{int16\_t} and the other using \texttt{float}. Some
+further optimizations were made by inspecting \texttt{perf} reports and
+assembly, including: 
+
+\begin{compactlist} 
+    \item Reduce memory operation
+    \item Unroll loops
+    \item\hl{TODO: what are the other optimizations?}
+\end{compactlist}
 
 \hl{TODO: Update here after Integrating into library}
 
 
 
 \chapter{Background}
+\section{Presburger library}
+
+The FPL paper obtained 465,460 representative linear problems encountered during
+integer set coalescing by analyzing linear programs in cache analytical
+modeling, polyhedral loop optimization, and accelerator code generation. It is
+found that most of the constraint matrices are low in dimensionality and small
+in the value of each element. Specifically, more than 99\% of the coefficients
+require less than 10 bits and 95\% of them are less than 20 columns \cite{FPL1}.
+Thus, most of the rows fit inside a 512-bit vector register of 32
+\texttt{int16\_t} elements, and a row operation can be done in a single
+instruction. 
+
+However, in rare and corner cases, there can be larger coefficients up to 127
+bits. Practically, the upper bound of coefficient size is unknown, making it
+required to have arbitrary precision arithmetic \texttt{LargeInteger} as a
+backup. Also, the maximum observed column count is 28 and there is not a certain
+maximum column count as well. 
+
+Therefore the FPL paper presents a 3-way transprecision implementation for the
+Presburger library, from row-wise vectorized \texttt{int16\_t} to element-wise
+scalar \texttt{int64\_t} and element-wise scalar \texttt{LargeInteger}, as
+illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the  
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{image/transprecision.png}
+    \caption{The The architecture of FPL.}
+    \label{fig:fpl_arch}
+\end{figure}
+
+
+The \texttt{int16\_t} layer targets the cases whewre
+
+
+
+To detect whether an 
+addition has gone overflown, the result of a conventional addition and saturated
+addition is compared. With saturated add, the results always retain at maximum
+possible value of int16\_t: 0x7FFF, therefore being different from the
+conventional add in case of overflow. 
+
+
 \section{Modern CPU micro-architecture}
 \section{code block example}
 \begin{verbatim}
