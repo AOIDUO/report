@@ -288,7 +288,19 @@ maximum column count as well.
 Therefore the FPL paper presents a 3-way transprecision implementation for the
 Presburger library, from row-wise vectorized \texttt{int16\_t} to element-wise
 scalar \texttt{int64\_t} and element-wise scalar \texttt{LargeInteger}, as
-illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the  
+illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the MLIR upstream
+only presents a 2-layer transprecision, consisting of element-wise scalar
+operation using \texttt{int64\_t} and \texttt{LargeInteger}. The
+\texttt{int16\_t} version is not merged with the upstream for two reasons: 
+\begin{compactlist} 
+    \item \texttt{int16\_t} vectors require AVX-512 ISA extension, but hardware
+    support are rare (Section \ref{sec:avx512}). 
+    \item Despite the \texttt{int16\_t} version is fast \hl{TODO: find how much
+    faster in FPL paper}, overflow checking overhead is ??\%\hl{TODO: find how
+    much is overhead} \cite{FPL2}. Using floating points could significantly
+    reduce this overhead and potentially be faster (Section \ref{sec:i23}).  
+\end{compactlist}
+
 
 \begin{figure}
     \includegraphics[width=\linewidth]{image/transprecision.png}
@@ -297,18 +309,29 @@ illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the
 \end{figure}
 
 
-The \texttt{int16\_t} layer targets the cases whewre
-
-
-
-To detect whether an 
-addition has gone overflown, the result of a conventional addition and saturated
-addition is compared. With saturated add, the results always retain at maximum
-possible value of int16\_t: 0x7FFF, therefore being different from the
-conventional add in case of overflow. 
-
-
 \section{Modern CPU micro-architecture}
+\label{sec:avx512}
+\subsection{Test Subsection}
+A recent trend in x86-64 architecture’s development is to include AVX-512
+instruction set architecture (ISA) extension. AVX-512 succeeds AVX2, the vector
+width is increased from AVX2’s 256 bits to 512 bits. AVX-512 also provides new
+instructions, like integer fused-multiply-add (IFMA) (footnote IFMA-52) and
+compare value into mask(VPCMPUW). 
+
+Even though its specification was released by Intel in 2013, it had been
+unpopular, as it does not bring practical performance improvements. There are
+two reasons, (1) there was barely any software support, (2) huge power
+consumption and overheating. For example, Intel’s implementation of AVX-512 in
+the Skylake-X series consists of fusing existing 2 256 bits AVX-2 units, then
+adding another FMA unit for AVX-512. This AVX-512 FMA unit results in server
+thermal problems when it is built with Skylake-X’s 14 nm lithography, thus
+causing throttling in clock frequency. 
+
+
+\section{``\texttt{int23\_t}''}
+\label{sec:i23}
+
+
 \section{code block example}
 \begin{verbatim}
     \begin{preliminary}
@@ -316,7 +339,7 @@ conventional add in case of overflow.
     \end{preliminary}
 \end{verbatim}
 
-\section{Modern CPU micro-architecture}
+\section{xx}
 
 Computer architecture textbooks often deceipts 
 
