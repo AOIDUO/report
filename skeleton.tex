@@ -311,26 +311,65 @@ operation using \texttt{int64\_t} and \texttt{LargeInteger}. The
 
 \section{Modern CPU micro-architecture}
 \label{sec:avx512}
-\subsection{Test Subsection}
+
 A recent trend in x86-64 architecture’s development is to include AVX-512
 instruction set architecture (ISA) extension. AVX-512 succeeds AVX2, the vector
-width is increased from AVX2’s 256 bits to 512 bits. AVX-512 also provides new
-instructions, like integer fused-multiply-add (IFMA) (footnote IFMA-52) and
-compare value into mask(VPCMPUW). 
+width is increased from AVX-2’s 256 bits to 512 bits. AVX-512 also provides new
+instructions, for example, \texttt{int16\_t} saturated addition.
+
+% \subsection{History}
 
 Even though its specification was released by Intel in 2013, it had been
-unpopular, as it does not bring practical performance improvements. There are
-two reasons, (1) there was barely any software support, (2) huge power
-consumption and overheating. For example, Intel’s implementation of AVX-512 in
-the Skylake-X series consists of fusing existing 2 256 bits AVX-2 units, then
-adding another FMA unit for AVX-512. This AVX-512 FMA unit results in server
-thermal problems when it is built with Skylake-X’s 14 nm lithography, thus
-causing throttling in clock frequency. 
+unpopular, as it did not bring practical performance improvements. The primary
+reason was that it consumed a lot more power than usual, causing severe
+overheating. The micro-architecture Skylake from Intel, and its AVX-512 enabled
+counterpart Skylake-X is a classic example. Skylake provides 2 256 bits FMA
+AVX-2 execution units 
+\footnote{Fused-multiply-add (FMA) execution units are a type of
+floating point execution units, capable of doing addition, multiplication or
+both in a single instruction. See Section \ref{sec:FMA}.} 
+and Intel provides 2 512-bit AVX-512 FMA units by
+fusing the existing AVX-2 units into a AVX-512 unit, then introduces an
+additional FMA AVX-512 unit \cite{SLK-X}. The additional AVX-512 unit increases
+the heat flux density of the chip, causing server thermal throttling issues. 
+
+Intel attempted to mitigate this problem by introducing the ``AVX-offset'' mode.
+When a workload involving AVX-512 instructions is encountered, the CPU
+automatically enters AVX-offset mode and reduces its clock frequency
+\cite{AVX-offset}. However, in practice it is more common to have a mix of
+control flow, SSE and AVX-512 instructions, causing many scenario could run
+faster if the additional AVX-512 is disabled (and does not thermal throttle)
+\cite{Zen4Critique}.
+
+AMD’s implementation of AVX-512 in Zen4 has slightly less computing power, but
+much more efficient. Zen4 can be considered as modernized version of Zen3 or
+Zen2, where Zen2 and Zen3 supports AVX2 by providing 2 FADD units
+\footnote{Floating-point add units (FADD) can to do addition only. They may be 
+considered as simplified FMA} 
+and 2 FMA units of 256-bit width.
+Zen4 merges these existing circuits to create a single 512-bit FADD
+and single
+512-bit FMA, without introducing any new execution units. Zen3 is reputable for
+its high performance per watt (evidence: my experience), and it is expected to
+be better on zen4 with more advanced lithography. Benchmarks indicate that this
+design indeed does not cause throttling in AVX-512 workloads.
+% (https://www.anandtech.com/show/14514/examining-intels-ice-lake-microarchitecture-and-sunny-cove/12#:~:text=2%20%2B%201-,AVX%2D512,-%2D)
+% This indicates that it is worthwhile to add software support to AVX-512 and
+% gain actual performance increments. 
+
+% Another benefit of AVX-512 is that it reduces front-end pressure. In the case
+% of Zen4 microarchitecture, though the back-end is possible to sustain 2 x
+% AVX-2 FADD and 2 x AVX-2 FMA every cycle, the front-end has to dispatch 4
+% instructions per cycle, which is quite difficult. With AVX-512 it only
+% requires 2 instructions to saturate the backend, this is more likely to be
+% achievable in a real-world workload.
+% (https://www.mersenneforum.org/showthread.php?p=614191)
 
 
 \section{``\texttt{int23\_t}''}
 \label{sec:i23}
-
+\subsection{Fused-multiply-add}
+\label{sec:FMA}
 
 \section{code block example}
 \begin{verbatim}
