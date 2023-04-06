@@ -16,6 +16,9 @@
     \sethlcolor{foo}\hl{#2}}%
 }
 
+\newcolumntype{L}[1]{>{\raggedright\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{C}[1]{>{\centering\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}}
 
 \newenvironment{compactlist}
 { \begin{enumerate}
@@ -226,37 +229,15 @@ pipeline, and the average cost of resetting per pivot is negligible.
 
 This report will first analyze the capability of modern CPU micro-architecture,
 especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
-example under the following configurations:
+example under the various configurations regarding vectorization methods, matrix
+data structures, element data types and data widths (Section \ref{sec:Toy}). 
 
-\begin{compactlist} 
-    \item Vectorization method 
-        \begin{compactlist} 
-            \item Clang's automatic vectorization from scalar code
-            \item Clang builtin vector datatype with occasional AVX intrinsics 
-        \end{compactlist}
-    \item Matrix data structure 
-        \begin{compactlist} 
-            \item Nested list
-            \item Flat list
-        \end{compactlist}
-    \item Element data type 
-        \begin{compactlist} 
-            \item Integer
-            \item Floating point
-        \end{compactlist}
-    \item Element data width
-        \begin{compactlist} 
-            \item 16 bits: \texttt{int16\_t}
-            \item 32 bits: \texttt{int32\_t}, \texttt{float}
-            \item 64 bits: \texttt{int64\_t}, \texttt{double}
-        \end{compactlist}
-\end{compactlist}
-
-It is discovered that clang builtin vector datatype and flat list data structure
-is faster than their counterpart. However, it is quite difficult to decide
-whether \texttt{int16\_t} or \texttt{float} is better, because the former
-benefits form bigger vector size and less instruction count, while the latter
-has minimal overhead on overflow checking. 
+It is discovered that optimal performance can be achieved by selecting clang
+builtin vector type as vectorization methods and use flat list as matrix data
+structure. However, it is quite difficult to decide whether \texttt{int16\_t} or
+\texttt{float} is better, because the former benefits form bigger vector size
+and less instruction count, while the latter has minimal overhead on overflow
+checking. 
 
 Then two detached versions of \texttt{pivot} function from the Presburger
 library are built from the most optimal configurations derived form the toy
@@ -349,33 +330,30 @@ with 2 or 3 comparison, shuffling and branch instructions:
 more instruction count and 60\% more runtime \cite{FPL2}. \hl{(TODO: verify this
 number?)}
 
+\begin{center}
 \begin{table}[ht]
 
-\begin{tabular}{ | m{6cm}| m{6cm} | } 
-% \begin{tabular}{ | m{4em} | m{6cm}| m{6cm} | } 
+\begin{tabular}{ | L{6cm}| R{6cm} | } 
     \hline  Addition & Multiplication \\ 
-    % \hline
-    % Disabled & 
-        % \texttt{vpaddw \%zmm4,\%zmm2,\%zmm3} & \texttt{vpmullw \%zmm1,\%zmm3,\%zmm2} \\ 
     \hline
-    % Enabled & 
         \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}}
         \hl{\texttt{vpaddsw \%zmm2,\%zmm4,\%zmm2}}
         \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm2,\%k1}}
         \hlc[cyan!60]{\texttt{kord \%k1,\%k0,\%k0}}
-        \small{\phantom{wwwwwwwwwwwwww}}
+        % \small{\phantom{wwwwwwwwwwwwww}}
      &  \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}}
         \hl{\texttt{vpmulhw \%zmm1,\%zmm3,\%zmm3}}
         \hlc[cyan!60]{\texttt{vpsraw \$0xf,\%zmm2,\%zmm5}}
         \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
         \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}}
-        \small {\phantom{wwwwwwwwwwwwww}} \\
+        % \small {\phantom{wwwwwwwwwwwwww}} 
+        \\
     \hline
   \end{tabular}
   \caption{\hl{(TODO: write caption)}}
   \label{table:i16-instr}
 \end{table}
-
+\end{center}
 \section{Modern CPU micro-architecture}
 \label{sec:avx512}
 
@@ -430,34 +408,236 @@ equivalency in AVX-512 only takes 2 instructions, this is much more likely to be
 sustained by the frontend \cite{Zen4Critique}.
 
 
-\section{``\texttt{int23\_t}''}
+\section{``\texttt{int23\_t}'' and ``\texttt{int52\_t}''}
 \label{sec:i23}
+\subsection{IEEE 754}
+IEEE 754 is the standard for representing and manipulating floating-point
+numbers in modern x86 computers. The standard defines several different formats
+for representing floating point numbers, the most common ones are 32-bit single
+precision (float) and 64-bit double precision (double). For each format, it
+specifies how many bits are used to represent the sign, exponent, and mantissa. 
+
+For float and double, the sign bit is a single bit that indicates whether the
+number is positive or negative. As figure \ref{fig:ieee-f32} shows, there are 8
+bits and 11 bits for exponent in float and double respectively, to represent
+represents the order of magnitude. The remaining 23 bits in float and 52 bits in
+double are mantissae, to store the fractional part of the number. The value of a
+floating point number can be computed through this formula: 
+\begin{math} (-1)^s * 2^{(e - B)} * (1 + f)\end{math}
+where \begin{math}s\end{math} is sign, \begin{math}e\end{math} is exponent, 
+\begin{math}f\end{math} is mantissa and \begin{math}B\end{math} is a constant bias
+value: \begin{math}127\end{math} for float, \begin{math}1023\end{math} for double. 
+
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{image/ieee-f32.png}
+    \includegraphics[width=\linewidth]{image/ieee-f64.png}
+    \caption{IEEE 754 single (32 bits) and double (64 bits) precision floating
+    point. \cite{ieee754-diagram}}
+    \label{fig:ieee-f32}
+\end{figure}
+
+
 \subsection{Fused-multiply-add}
 \label{sec:FMA}
 
-\section{code block example}
+After doing floating point arithmetic, it is required to normalize the result of
+floating-point arithmetic before it can be used further. However, by feeding the
+result of a floating-point multiplication (FMUL) directly into the
+floating-point addition (FADD) logic without the need for normalization and
+rounding in between, a fused multiply-add (FMA) operation is effectively
+created: 
+\begin{math}Y = (A * B) + C \end{math}, where 
+\begin{math}A\end{math},
+\begin{math}B\end{math} and
+\begin{math}C\end{math} are the operands, 
+ \begin{math}Y\end{math} is the result \cite{CARD}.
+
+FMA saves cycles and reduces accumulation of rounding errors, while at the same
+time not adding significant complexity to the circuit. A FMA execution unit is
+capable to do FMUL, FADD, and FSUB as well: 
+\begin{compactlist} 
+\item[] Addition: \begin{math}Y = (A * 1.0) + C \end{math} 
+\item[] Multiplication: \begin{math} Y = (A * B) + 0.0 \end{math} 
+\item[] Subtraction: \begin{math} Y = (A * -1.0) + C\end{math} 
+\end{compactlist} 
+
+This is a useful feature in many numerical computations that involve
+simultaneous multiplication and addition operations, such as dot product and
+matrix multiplication. Since the pivot function performs multiplication and
+addition between the pivot row, some constant value and each row in the matrix,
+the performance of FMA is critical to the overall efficiency of the algorithm. 
+
+\subsection{Floating point exceptions and Fenv library}
+\label{sec:fpe}
+\hl{Arjun: I feel this is not really background, we are getting into the implementation now}
+
+\section{Google Benchmark}
+Google benchmark is a library to measure the performance of a code snippet. It
+provides unit-test like interfaces to setup benchmarks around a code snippet
+\cite{googlebench}. The given example from https://github.com/google/benchmark
+is self-explanatory for its usage: 
+
 \begin{verbatim}
-    \begin{preliminary}
-        ...
-    \end{preliminary}
+#include <benchmark/benchmark.h>
+
+static void BM_SomeFunction(benchmark::State& state) {
+    // Perform setup here
+    for (auto _ : state) {
+    // This code gets timed
+    SomeFunction();
+    }
+}
+// Register the function as a benchmark
+BENCHMARK(BM_SomeFunction);
+// Run the benchmark
+BENCHMARK_MAIN();
 \end{verbatim}
 
-\section{xx}
+The library first starts a timer, repeatedly executes its core loop: \texttt{for
+(auto \_ : state) ... } multiple times then pauses the timer. This method
+ensures that the results are consistent and minimizes the overhead required for
+recording the timing information. 
 
-Computer architecture textbooks often deceipts 
+Executing the benchmarks will not only report both elapsed real time and CPU
+time, but also much other useful information to help reduce variance. 
+\begin{verbatim}
+Running ./build/example
+***WARNING*** CPU scaling is enabled, the benchmark real time 
+measurements may be noisy and will incur extra overhead.
+Run on (32 X 5800.00 MHz CPU s)
+CPU Caches:
+    L1 Data 32 KiB (x16)
+    L1 Instruction 32 KiB (x16)
+    L2 Unified 1024 KiB (x16)
+    L3 Unified 32768 KiB (x2)
+Load Average: 8.10, 5.14, 1.14
+----------------------------------------------------------
+Benchmark                Time             CPU   Iterations
+----------------------------------------------------------
+BM_SomeFunction       18.5 ns         18.5 ns     37935734
+\end{verbatim}
 
-\section{Citations}
+The warning: ``CPU scaling is enabled, the benchmark real-time measurements may
+be noisy and will incur extra overhead.'' is saying that CPU clock frequency is
+not consistent. It can be dynamically determined by the governor algorithm,
+according on the system's needs. For example, with the \texttt{performance}
+governor, the OS locks the CPU to the highest possible clock frequency,
+specified at \texttt{/sys/devices/system/cpu/cpu*/cpufreq/scaling\_max\_freq},
+while the \texttt{ondemand} governor will push the CPU to the highest frequency
+on demand and then gradually reduce the frequency as the idle time increases
+\cite{archLinuxFreqScal}.
 
-Citations (such as \cite{P1} or \cite{P2}) can be generated using
-\texttt{BibTeX}. For more advanced usage, we recommend using the \texttt{natbib}
-package or the newer \texttt{biblatex} system.
+However, it is also dependent on the manufacture and other hardware constraints.
+By default, both Intel (Turbo Boost) and AMD (Precision Boost Overdrive) have
+support for raising clock frequency, beyond the control of the governor
+\cite{GoogleBenchReduceVariance}. On the other hand, CPUs have self-protecting
+thermal throttling mechanisms that reduces its clock frequency and voltage when
+it is too hot. 
 
-These examples use a numerical citation style. You may use any consistent
-reference style that you prefer, including ``(Author, Year)'' citations.
+The benchmark mentioned in this report were performed on a AMD 7950x desktop
+computer. The computer system went through the following these setups for
+consistent results:
+\begin{compactlist}
+    \item Set the governor to \texttt{performance}, 
+    \item Disable AMD Precision Boost Overdrive (or Intel Turbo Boost), 
+    \item Lock clock frequency at a 5 GHz, or any desired fixed value,
+    \item Make sure heat dissipation is working properly.
+\end{compactlist}
 
-\chapter{Your next chapter}
 
-A dissertation usually contains several chapters.
+
+\section{\texttt{llvm-mca}}
+
+\texttt{llvm-mca}, LLVM Machine Code Analyzer, is a tool to analyze performance of
+executing some instructions on a specific CPU micro-architecture, according to
+scheduling information provided by LLVM \cite{llvm-mca}. This tool may help with predicting and
+explaining performance characteristics \hl{TODO: Is it necessary to mention mca?
+Only use case is I found it not helpful}
+
+
+\chapter{Experiments with Toy Example}
+\label{sec:Toy}
+
+The pivot function does multiply and add for each row in the matrix, therefore
+the performance of FMA a simple vector toy can be an effective indicator. This
+chapter reports performance analysis on simple toy examples that do vector add
+or vector FMA with various setups, including: 
+
+\begin{enumerate} 
+    \item Vectorization method 
+        \begin{compactlist} 
+            \item Clang's automatic vectorization from scalar source code
+            \item Clang builtin vector datatype with occasional AVX intrinsics 
+        \end{compactlist}
+    \item Matrix data structure 
+        \begin{compactlist} 
+            \item Nested list
+            \item Flat list
+        \end{compactlist}
+    \item Element data type 
+        \begin{compactlist} 
+            \item Integer
+            \item Floating point
+        \end{compactlist}
+    \item Element data width
+        \begin{compactlist} 
+            \item 16 bits: \texttt{int16\_t}
+            \item 32 bits: \texttt{int32\_t}, \texttt{float}
+            \item 64 bits: \texttt{int64\_t}, \texttt{double}
+        \end{compactlist}
+\end{enumerate}
+
+\section{Vectorization method}
+
+\section{Matrix data structure}
+
+The most intuitive data structure of a matrix is a list of lists, where each
+list represents a row and a list of rows is a matrix. In C++ this can be
+represented using \texttt{std::vector<std::vector<T>>}, where \texttt{T} could
+be \texttt{float}, \texttt{double}, \texttt{int32\_t}, etc. The std::vector
+class provides an intuitive interface for accessing and modifying elements,
+making it easy to write code with. 
+
+One potential drawback of nested \texttt{std::vector} is that it requires two
+indexing operations to access an element. An alternative implementation is to
+“flatten” a matrix into a single \texttt{std::vector}, by simply concatenating
+one row after another. To access a specific element, an index can be computed
+manually using the given row and column: \texttt{column\_count * row + column}.
+This reduces half of the memory indexing operation at the cost of additional
+arithmetic. 
+
+The table below provides an example of a 4 by 4 matrix of int, to highlight the
+differences between the two matrix data structures. 
+
+\begin{center}
+    \begin{table}[ht]
+    
+    \begin{tabular}{ | m{6cm}| m{6cm} | } 
+    % \begin{tabular}{ | m{4em} | m{6cm}| m{6cm} | } 
+        \hline  Addition & Multiplication \\ 
+        % \hline
+        % Disabled & 
+            % \texttt{vpaddw \%zmm4,\%zmm2,\%zmm3} & \texttt{vpmullw \%zmm1,\%zmm3,\%zmm2} \\ 
+        \hline
+        % Enabled & 
+            \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}}
+            \hl{\texttt{vpaddsw \%zmm2,\%zmm4,\%zmm2}}
+            \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm2,\%k1}}
+            \hlc[cyan!60]{\texttt{kord \%k1,\%k0,\%k0}}
+            \small{\phantom{wwwwwwwwwwwwww}}
+         &  \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}}
+            \hl{\texttt{vpmulhw \%zmm1,\%zmm3,\%zmm3}}
+            \hlc[cyan!60]{\texttt{vpsraw \$0xf,\%zmm2,\%zmm5}}
+            \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
+            \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}}
+            \small {\phantom{wwwwwwwwwwwwww}} \\
+        \hline
+      \end{tabular}
+      \caption{\hl{(TODO: write caption)}}
+      \label{table:nested-flatten}
+    \end{table}
+    \end{center}
 
 \chapter{Conclusions}
 
