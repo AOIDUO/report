@@ -10,6 +10,18 @@
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{soul}
+\usepackage{booktabs}
+\usepackage{fancyvrb}
+\usepackage{relsize}
+\newenvironment{VerbatimCompact}
+  {\vspace*{-2.5mm}\VerbatimEnvironment
+   \par\Verbatim}
+  {\endVerbatim}
+
+
+\newcolumntype{V}[1]{>{\topsep=0pt\@minipagetrue}p{#1}<{\vspace{-\baselineskip}}}
+\makeatother
+\newcommand{\command}[1]{\texttt{\string#1}}
 
 \newcommand{\hlc}[2][yellow]{{%
     \colorlet{foo}{#1}%
@@ -652,55 +664,155 @@ manually using the given row and column: \texttt{column\_count * row + column}.
 This reduces half of the memory indexing operation at the cost of additional
 arithmetic. 
 
-The table below provides an example of a 4 by 4 matrix of int, to highlight the
-differences between the two matrix data structures. 
+The Table \ref{table:nested-flat} provides an example of a 4 by 4 matrix of
+\texttt{int32\_t}, to highlight the differences between the two matrix data
+structures. 
 \hl{TODO: make table}
+\begin{table}[ht]
 
-% \begin{center}
-% \begin{table}[ht]
-% \begin{tabular}{ | c | l |  l | }  
-%     \hline & Nested & Flat \\ 
-%     \hline
-%         Type
-%     & 
-%         \texttt{std::vector<std::vector<int32\_t>>}
-%     &
-%         \texttt{std::vector<int32\_t>} \\
+\begin{tabular}{%
+    >{\raggedright\arraybackslash}p{2cm}%
+    >{\raggedright\arraybackslash}p{6.5cm}%
+    >{\raggedright\arraybackslash}p{4.5cm}}
     
-%     \hline
-%         Structure 
-%     & \texttt{std::vector of length 4 = \string{ \string} }
-%     & 
-%         std::vector of length 16 = 
-%     \\
-%     in Memory    
-%     & X
-%     & X
+    \toprule
+    & Nested & Flat\\
 
-%         % 0, 0, 0, 0, 0, 0, 0, 0,
-%         % 0, 0, 0, 1, 0, 0, 0, 0
-%     \\
-%     \hline
+    \midrule
     
+    Type
+    &
+    \begin{VerbatimCompact}
+std::vector<
+    std::vector<int32_t>>
+    \end{VerbatimCompact}
+    &
+    \begin{VerbatimCompact}
+std::vector<int32_t>
+    \end{VerbatimCompact}
+    \\
 
-%   \end{tabular}
-%   \caption{\hl{(TODO: write caption)}}
-%   \label{table:nested-flatten}
-% \end{table}
-% \end{center}
+Structure in Memory
+    &
+    \begin{VerbatimCompact}
+vector of 4 = {
+    vector of 4 = {0, 0, 0, 0}, 
+    vector of 4 = {0, 0, 0, 0}, 
+    vector of 4 = {0, 0, 0, 1}, 
+    vector of 4 = {0, 0, 0, 0}
+}
+    \end{VerbatimCompact}
+    &
+    \begin{VerbatimCompact}
+vector of 16 = {
+    0, 0, 0, 0, 
+    0, 0, 0, 0,
+    0, 0, 0, 1, 
+    0, 0, 0, 0
+}
+    \end{VerbatimCompact}
+    \\
+
+    Accessing row 2, column 3
+    &
+    Index row first: \texttt{std::vector<int32\_t>[2]} \linebreak
+    then index column: 
+        \texttt{std::vector<int32\_t>[2][3]}
+    & 
+    Compute \texttt{i = 
+    \linebreak col\_count * row + col \linebreak = 4 * 2 + 3 =
+    11}, \linebreak then index once: \texttt{std::vector<int32\_t>[11]}  \\
+
+    \bottomrule
+
+\end{tabular}
+\caption{\hl{(TODO: write caption)}}
+\label{table:nested-flat}
+\end{table}
 
 Empirically indexing costs more time than integer multiplication and addition,
 thereby improving performance. Both the toy example and the pivot function
 perform sequential load-compute-store operations on each row and each column,
 allowing the index of the next element to be computed by simply adding the step
 size or column size, further reducing memory overhead. In fact, the pivot
-function only calls the index computation function once, for the address of the
-first element (See optimization section \hl{(TODO: ref)}) and once for the address of the pivot
-row. 
+function can be optimized to only compute index once (See Section \hl{(TODO:
+ref)}) by placing the pivot row as first row. Benchmark (Figure
+\ref{fig:nested-flat}) on the toy example confirms that when there are 16 rows,
+the nested vector matrix is about 8 ns faster than the flat matrix.
 
-Benchmark on the toy example confirms that when there are 16 rows, the nested
-vector matrix is about 6 ns faster than the flat matrix, and will be even slower
-as the row size grows. 
+\begin{figure}
+    \includegraphics[width=\linewidth]{image/nested-flat.jpg}
+    \caption{\hl{TODO: write caption}}
+    \label{fig:nested-flat}
+\end{figure}
+
+
+\subsection{Matrix element data type}
+
+
+
+% \begin{tabular}{lll}
+%     \toprule
+%       & Nested & Flat \\
+
+%     \midrule
+%         Type
+%       & \verb| std::vector<std::vector<int32_t>> |
+%       & \verb| std::vector<int32_t> | 
+%       \\
+%     \midrule
+      
+%       \bottomrule
+% \end{tabular}
+    
+% \bigskip
+
+% \begin{tabular}{lV{}}
+%     \toprule
+%     Command & Example 
+%     \\
+%     \midrule
+%     \command{\citeplist} &
+%     \begin{verbatim}
+%     \citeplist{peel_epidemiology_2011,espinoza2012inverse,
+%                espinoza2012optimization
+%     \end{verbatim}
+%     \\
+%     \command{\citet} &
+%     \begin{verbatim}
+%     \citet{peel_epidemiology_2011,espinoza2012inverse,
+%            espinoza2012optimization
+%     \end{verbatim}
+%     \\
+%     \command{\citeyear} &
+%     \begin{verbatim}
+%     \citeyear{peel_epidemiology_2011}
+%     \end{verbatim}
+%     \\
+%     \bottomrule
+%     \end{tabular}
+
+Using shorter data types can be more advantageous than longer ones because they
+allow more numbers to be packed into a single vector register (Table 1). The
+number of instructions can be reduced to half when data width is reduced to
+half, and less instruction count always leads to less execution time. As
+confirmed in the plot below, int32 and double costs double the time than int16
+and float respectively.  
+
+Apart from floating point numbers having automatic overflow checking, a benefit
+of int16 is that the ISA supports saturated add and multiply higher bits (Table
+1), but equivalent instruction does not exist for int32 and int64. When the
+result of a conventional add does not match the result of a saturated add, or
+when multiplying for the higher 16 bits gives non-zero results, it implies an
+overflow. 
+
+
+
+
+
+
+
+
 
 
 \chapter{Conclusions}
