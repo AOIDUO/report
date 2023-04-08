@@ -16,7 +16,7 @@
 \newenvironment{VerbatimCompact}
   {\vspace*{-2.5mm}\VerbatimEnvironment
    \par\Verbatim}
-  {\endVerbatim}
+  {\endVerbatim\vspace*{-2.4mm}}
 
 
 \newcolumntype{V}[1]{>{\topsep=0pt\@minipagetrue}p{#1}<{\vspace{-\baselineskip}}}
@@ -610,6 +610,7 @@ or vector FMA with various setups, including:
 
 \section{Vectorization method}
 
+\subsection{Clang's automatic vectorization}
 Clang is capable of generating vectorized instructions from scalar source code,
 using the flags \texttt{-O3 -march=native} on a platform with vector ISA
 enabled. Starting with an example, the simple \texttt{vec\_add} function below
@@ -617,10 +618,8 @@ is a function that it adds every element from two arrays and saves it to the
 third. 
 % \begin{small}
 \begin{verbatim}
-void vec_add(float * src1_ptr, 
-             float * src2_ptr, 
-             float * dst_ptr) {
-    const uint32_t size = 32;
+#define size = 128
+void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
     for (uint32_t i = 0; i < size; i += 1 ){
         dst_ptr[i] = src1_ptr[i] + src2_ptr[i];
     }
@@ -628,6 +627,7 @@ void vec_add(float * src1_ptr,
 \end{verbatim}
 % \end{small}
 
+\hl{TODO: change avx-2 to avx-512}
 After compiling on a AVX-2 enabled computer and disassembling the binary, it is
 observed that clang automatically packs 8 \texttt{float} (256 bits) as a operand
 of the \texttt{VADDPS} instruction. 
@@ -652,13 +652,55 @@ selected:
 1215: d9 44 86 08    flds   0x8(%rsi,%rax,4)
 \end{verbatim}
 
-However, the automatic vectorization feature in clang can be unpredictable and
-may lead to undesired behaviors. It operates as a black box and may take a lot
-of effort to understand its mechanisms. One of the issues with clang's automatic
-vectorization is that it may select a suboptimal vector width. Consider the
-\texttt{vec\_fma} function below, a slightly more complicated version of the
-previous \texttt{vec\_add} example, where an additional array is introduced and
-the element-wise operation is changed from addition to FMA. 
+\subsection{Clang's vector datatype and AVX intrinsics}
+
+Another approach is to write source code with vectorization in mind in the first
+place. Clang provides extension that allows programmers to declare a new type
+that represents a vector of elements of the same data type. The syntax is 
+\begin{VerbatimCompact}[commandchars=\\\{\}]
+typedef \textit{ty} \textit{vec_ty} __attribute__((ext_vector_type(\textit{vec_width}))), 
+\end{VerbatimCompact}
+where \textit{vec\char`_ty} is the name of vector type being defined,
+\textit{\texttt{vec\char`_width}} is its size and \textit{\texttt{ty}} is the
+type of the elements in the vector. For example, 
+\begin{VerbatimCompact}[commandchars=\\\{\}]
+typedef int16_t int16x32 __attribute__((ext_vector_type(32)))
+\end{VerbatimCompact}
+defines a 512-bit vector type of \texttt{int16x32}, consisting of 32
+\texttt{int16\char`_t} and fits inside an AVX-512 ZMM register. 
+
+After defining a vector datatype, a vector variable can be created by casting
+from a pointer of the target array. Then arithmetic operators can be applied
+between the vectors to performed element-wise operations. The previous
+\texttt{vec\_add} example can be rewritten as follows:
+
+\begin{verbatim}
+#define size = 128
+#define FloatZmmSize 16
+typedef float floatZmm __attribute__((ext_vector_type(FloatZmmSize)));
+void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
+    for (uint32_t i = 0; i < size; i += FloatZmmSize ){
+        floatZmm src1Vec = *(Zmm *)(src1_ptr + i);
+        floatZmm src2Vec = *(Zmm *)(src2_ptr + i);
+        floatZmm resultVec = src1Vec + src2Vec;
+        *(Zmm *)(dst_ptr + i) = resultVec;
+    }
+}
+\end{verbatim}
+
+
+\subsection{Evaluation}
+When comparing the performance of code written with and without the vector type
+and examining their assembly, it has been discovered that the the automatic
+vectorization feature in clang can be unpredictable and may lead to undesired
+behaviors. It operates as a black box and may take a lot of effort to understand
+its mechanisms. One of the issues is that clang may select a suboptimal vector
+width.
+
+Consider the \texttt{vec\_fma} function below, a
+slightly more complicated version of the previous \texttt{vec\_add} example,
+where an additional array is introduced and the element-wise operation is
+changed from addition to FMA. 
 
 \begin{verbatim}
 void vec_fma(float * src1_ptr, 
@@ -671,6 +713,7 @@ void vec_fma(float * src1_ptr,
     }
 }
 \end{verbatim}
+
 
 In this scenario, the disassembly reveals that clang decides to use FMA vector
 instructions of 128-bit width, rather than 256-bit width, which is the more
