@@ -683,7 +683,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
         floatZmm src1Vec = *(Zmm *)(src1_ptr + i);
         floatZmm src2Vec = *(Zmm *)(src2_ptr + i);
         floatZmm resultVec = src1Vec + src2Vec;
-        *(Zmm *)(dst_ptr + i) = resultVec;
+        *(floatZmm *)(dst_ptr + i) = resultVec;
     }
 }
 \end{verbatim}
@@ -703,21 +703,29 @@ where an additional array is introduced and the element-wise operation is
 changed from addition to FMA. 
 
 \begin{verbatim}
-void vec_fma(float * src1_ptr, 
-             float * src2_ptr, 
-             float * src3_ptr, 
-             float * dst_ptr) {
-    const uint32_t size = 32;
+void vec_fma(float* src1_ptr, float* src2_ptr,
+             float* src3_ptr, float* dst_ptr) {
     for (uint32_t i = 0; i < size; i += 1 ){
         dst_ptr[i] = src1_ptr[i] * src2_ptr[i] + src3_ptr[i];
     }
 }
 \end{verbatim}
 
-
 In this scenario, the disassembly reveals that clang decides to use FMA vector
-instructions of 128-bit width, rather than 256-bit width, which is the more
-optimal option. \hl{TODO: Explain why}
+instructions of 128-bit width, rather than the more
+optimal 512-bit width. \hl{TODO: Explain why}
+
+
+\begin{verbatim}
+vmovss (%rdx,%rsi,4),%xmm0
+lea    0x8b(%r15,%r13,1),%esi
+vmovss (%rcx,%rax,4),%xmm1
+lea    0x8a(%r11,%r13,1),%eax
+vfmadd213ss (%r8,%rdi,4),%xmm0,%xmm1
+lea    0x8b(%rbx,%r13,1),%edi
+vmovss %xmm1,(%r9,%rax,4)
+lea    0x8b(%r14,%r13,1),%eax
+\end{verbatim}
 
 \begin{verbatim}
 80e4: c5 fa 10 04 b2       	vmovss (%rdx,%rsi,4),%xmm0
@@ -734,6 +742,22 @@ optimal option. \hl{TODO: Explain why}
 8119: 00 
 \end{verbatim}
 
+\begin{verbatim}
+#define size = 128
+#define FloatZmmSize 16
+typedef float floatZmm __attribute__((ext_vector_type(FloatZmmSize)));
+void vec_fma(float* src1_ptr, float* src2_ptr,
+             float* src3_ptr, float* dst_ptr) {
+    for (uint32_t i = 0; i < size; i += 1 ){
+        floatZmm src1Vec = *(Zmm *)(src1_ptr + i);
+        floatZmm src2Vec = *(Zmm *)(src2_ptr + i);
+        floatZmm src3Vec = *(Zmm *)(src3_ptr + i);
+        *(floatZmm *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
+    }
+}
+\end{verbatim}
+
+
 In some cases it is even worse, clang fails to recognize vectorization patterns
 from element-wise loop operations, leading to more reduction in performance. In
 \texttt{vec\_fma} example, by changing the type signature from \texttt{float} to
@@ -742,17 +766,28 @@ from element-wise loop operations, leading to more reduction in performance. In
 selection of instructions are \texttt{vpaddd} and \texttt{vpmulld}.
 
 \begin{verbatim}
-void vec_fma(int * src1_ptr, 
-             int * src2_ptr, 
-             int * src3_ptr, 
-             int * dst_ptr) {
-    const uint32_t size = 32;
+#define size = 128
+void vec_fma(int* src1_ptr, int* src2_ptr, 
+             int* src3_ptr, int* dst_ptr) {
     for (uint32_t i = 0; i < size; i += 1 ){
         dst_ptr[i] = src1_ptr[i] * src2_ptr[i] + src3_ptr[i];
     }
 }
 \end{verbatim}
-
+\begin{verbatim}
+#define size = 128
+#define IntZmmSize 16
+typedef int intZmm __attribute__((ext_vector_type(IntZmmSize)));
+void vec_fma(int* src1_ptr, int* src2_ptr, 
+             int* src3_ptr, int* dst_ptr) {
+    for (uint32_t i = 0; i < size; i += 1 ){
+        intZmm src1Vec = *(Zmm *)(src1_ptr + i);
+        intZmm src2Vec = *(Zmm *)(src2_ptr + i);
+        intZmm src3Vec = *(Zmm *)(src3_ptr + i);
+        *(intZmm *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
+    }
+}
+\end{verbatim}
 \begin{verbatim}
 88b0: 44 8b 69 1c  mov    0x1c(%rcx),%r13d
 88b4: 44 8b 62 1c  mov    0x1c(%rdx),%r12d
