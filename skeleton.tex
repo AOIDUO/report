@@ -290,7 +290,7 @@ assembly, including:
 
 \chapter{Background}
 \section{Presburger library}
-\subsection{Overview}
+% \subsection{Overview}
 
 The FPL paper obtained 465,460 representative linear problems encountered during
 integer set coalescing by analyzing linear programs in cache analytical
@@ -330,69 +330,6 @@ operation using \texttt{int64\_t} and \texttt{LargeInteger}. The
     \caption{The The architecture of FPL.}
     \label{fig:fpl_arch}
 \end{figure}
-
-\subsection{Implementation of detecting overflow for \texttt{int16\_t} }
-
-By comparing the result of a conventional addition and saturated addition, it
-indicates whether an addition has gone overflown or not. In case of overflow,
-with saturated add, the result always retains at the maximum possible value of
-\texttt{int16\_t}: \texttt{0x7FFF}, while the result of a conventional add is
-always smaller, because the overflowed output from conventional addition
-can't go all the way around and become \texttt{INT16\_MAX} again. In the two's
-complement binary form for integer, the overflow sum is "trapped" in the
-negative number space. For example: 
-\begin{verbatim}
-    INT16_MAX + 1 = INT16_MIN = -32768, 
-    INT16_MAX + 2 = -32767, 
-    ...
-    INT16_MAX + INT16_MAX = -2, 
-\end{verbatim}
-
-For multiplication, as two 16-bit numbers produces 32-bit products but only
-lower 16 bits can be stored, overflow can be detected by checking whether any of
-the upper 16 bits are set. 
-
-Inspecting these approaches from a instruction-level perspective (Table
-\ref{table:i16-instr}), when overflow is ignored, both add and multiply takes 1
-instruction, \hlc[pink]{\texttt{vpaddw}} and \hlc[pink]{\texttt{vpmullw}}. To
-obtain and process overflow-related information, an additional computation
-instruction \hl{\texttt{vpaddsw}} or \hl{\texttt{vpmulhw}} is required, followed
-with 2 or 3 comparison, shuffling and branch instructions:
-\hlc[cyan!60]{\texttt{vpsraw}}, \hlc[cyan!60]{\texttt{vpcmpneqw}} and
-\hlc[cyan!60]{\texttt{kord}}. By enabling overflow checking, it brings  4x or 5x
-more instruction count and 60\% more runtime \cite{FPL2}. \hl{(TODO: verify this
-number?)}
-
-\begin{center}
-\begin{table}[ht]
-
-\begin{tabular}{  c  L{5.5cm} L{5.5cm}  } 
-     & Addition & Multiplication \\ 
-    \midrule
-        Disabled 
-    & 
-        \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}} 
-    &
-        \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}} \\
-    \midrule
-        Enabled 
-    &
-        \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}}
-        \hl{\texttt{vpaddsw \%zmm2,\%zmm4,\%zmm2}}
-        \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm2,\%k1}}
-        \hlc[cyan!60]{\texttt{kord \%k1,\%k0,\%k0}}
-    &  
-        \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}}
-        \hl{\texttt{vpmulhw \%zmm1,\%zmm3,\%zmm3}}
-        \hlc[cyan!60]{\texttt{vpsraw \$0xf,\%zmm2,\%zmm5}}
-        \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
-        \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}} \\
-  \end{tabular}
-  \caption{\hl{(TODO: write caption)}}
-  \label{table:i16-instr}
-\end{table}
-\end{center}
-
 
 \section{Modern CPU micro-architecture}
 \label{sec:avx512}
@@ -448,7 +385,7 @@ equivalency in AVX-512 only takes 2 instructions, this is much more likely to be
 sustained by the frontend \cite{Zen4Critique}.
 
 
-\section{``\texttt{int23\_t}'' and ``\texttt{int52\_t}''}
+\section{Floating points}
 \label{sec:i23}
 \subsection{IEEE 754}
 IEEE 754 is the standard for representing and manipulating floating-point
@@ -476,7 +413,6 @@ value: \begin{math}127\end{math} for float, \begin{math}1023\end{math} for doubl
     point. \cite{ieee754-diagram}}
     \label{fig:ieee-f32}
 \end{figure}
-
 
 \subsection{Fused-multiply-add}
 \label{sec:FMA}
@@ -507,6 +443,51 @@ simultaneous multiplication and addition operations, such as dot product and
 matrix multiplication. Since the pivot function performs multiplication and
 addition between the pivot row, some constant value and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
+
+\subsection{Representing ``\texttt{int23\_t}'' and ``\texttt{int52\_t}'' using
+floating points}
+\label{sec:fpe2}
+
+There is a common stereotype that floating-point numbers are unreliable and
+likely to be imprecise, and are often illustrated in popular memes (as shown in
+Figure \ref{meme}). However, when storing integer values inside floating points, 
+floating points can be quite reliable. 
+
+Specifically, given that the mantissa part of a float consists of 23 bits,
+inexactness never occur when representing integers less than 23 bits (ignoring
+the sign bit). Furthermore, in case of of an integer overflow, floating point
+imprecision almost always occurs and a corresponding status registers is set.
+The same concept applies to double data types, which have a mantissa consisting
+of 52 bits.
+
+This mechanism is reliable, as floating-point inexactness always implies
+integer-inexactness. For a integer value with bit width greater than the
+mantissa size, floating point rounding is triggered in order to fit most
+significant bits of the integer in the mantissa, and then adjust the order of
+magnitude in the exponent accordingly. The lower bits of the mantissa are
+truncated, therefore causing imprecision. 
+
+In some rare cases, integers longer than the size of mantissa can be represented
+in floating points precisely. An examples of such numbers are large powers of 2,
+like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \texttt{float}
+is:
+\begin{VerbatimCompact}
+Sign    : 0
+Exponent: 10011011
+Mantissa: 00000000000000000000000
+\end{VerbatimCompact}
+Despite being greater than the size of
+the mantissa, they are normalized rather then being rounded, and therefore does
+not break the mechanism of representing integer in floating-points.
+
+\begin{figure}
+\begin{center}
+    \includegraphics[width=50mm,scale=0.1]{image/0.3004.jpg}
+    \caption{A floating point meme: 0.1 + 0.2 = 0.30000000000000004}
+    \label{meme}
+\end{center}
+\end{figure}
+
 
 \subsection{Floating point exceptions and Fenv library}
 \label{sec:fpe}
@@ -1036,13 +1017,13 @@ data type. As confirmed in Plot \ref{fig:col8-col16-col32-i16-i32-f32-f64},
 \texttt{int16\_t} and \texttt{float} respectively.
 
 
-\begin{figure}
+\begin{figure}[H]
     \includegraphics[width=\linewidth]{image/col8-col16-col32-i16-i32-f32-f64.png}
     \caption{\hl{TODO: write caption}}
     \label{fig:col8-col16-col32-i16-i32-f32-f64}
 \end{figure}
 
-\begin{figure}\captionsetup{name=}
+\begin{figure}[H]\captionsetup{name=}
     \includegraphics[width=\linewidth]{image/arch-table.png}
     \caption{\hl{TODO: write caption}}
     \label{archtable}
@@ -1050,11 +1031,124 @@ data type. As confirmed in Plot \ref{fig:col8-col16-col32-i16-i32-f32-f64},
 
 \subsection{Overflow checking for integers}
 
-A benefit of int16 is that AVX-512 supports saturated add and multiply higher
-bits instructions (Table \ref{archtable}), but equivalent instruction does not
-exist for int32 and int64. When the result of a conventional add does not match
-the result of a saturated add, or when multiplying for the higher 16 bits gives
-non-zero results, it implies an overflow. 
+The x86-64 micro-architecture provides the \texttt{seto} instruction to set some
+byte to \texttt{1} if overflow occurred as a result of integer arithmetic.
+However \texttt{seto} only works for scalar operations, there does not exist
+instruction or status register to indicate whether a previous vector add or
+multiply instruction produces overflown results or not. Therefore, overflow has
+to be checked manually by some additional vector instructions, this would slow
+down the computation to some extent. Or alternatively or arithmetics have to be
+carried out on each element individually in a scalar manner,resulting in even
+worse performance. 
+
+
+% One advantage of using \texttt{int16\_t} is that it can be used with AVX-512's
+% saturated add and multiply higher bits vector instructions, which are listed in
+% Table \ref{archtable}. This allows for the creation of vectorized code that
+% takes overflow into account and is therefore more efficient. However, it should
+% be noted that there are no equivalent instructions for \texttt{int32_t} and
+% \texttt{int64_t}.
+
+One advantage of \texttt{int16\_t} is that it can be used with AVX-512's
+saturated add and multiply higher bits vector instructions (Table
+\ref{archtable}), making it possible and convenient to write vectorized and
+overflow-aware code. However, Zen4's implementation of AVX-512 extension does
+not provide equivalent instruction for \texttt{int32\_t} or \texttt{int64\_t},
+and therefore must be processed as scalar values.
+% When the
+% result of a conventional add does not match the result of a saturated add, or
+% when multiplying for the higher 16 bits gives non-zero results, it implies an
+% overflow. 
+
+
+% \subsection{Implementation of detecting overflow for \texttt{int16\_t} }
+\subsubsection{Implementation of vectorized \texttt{int16\_t} overflow checking}
+By comparing the result of a conventional addition and saturated addition, it
+indicates whether an addition has gone overflown or not. In case of overflow,
+with saturated add, the result always retains at the maximum possible value of
+\texttt{int16\_t}: \texttt{0x7FFF}, while the result of a conventional add is
+always smaller, because the overflowed output from conventional addition can't
+go all the way around and become \texttt{INT16\_MAX} again. In the two's
+complement binary form for integer, the overflow sum is "trapped" in the
+negative number space. For example: 
+\begin{verbatim}
+INT16_MAX + 1 = INT16_MIN = -32768, 
+INT16_MAX + 2 = -32767, 
+...
+INT16_MAX + INT16_MAX = -2, 
+\end{verbatim}
+
+For multiplication, as two 16-bit numbers produces 32-bit products but only
+lower 16 bits can be stored, overflow can be detected by checking whether any of
+the upper 16 bits are set. 
+
+Inspecting these approaches from a instruction-level perspective (Table
+\ref{table:i16-instr}), when overflow is ignored, both add and multiply takes 1
+instruction, 
+\hlc[pink]{\texttt{vpaddw}}\footnote{Vector add for \texttt{int16\_t}} 
+and 
+\hlc[pink]{\texttt{vpmullw}}\footnote{Vector multiply lower half bits for \texttt{int16\_t}}. 
+To obtain and process overflow-related
+information, an additional computation instruction
+\hl{\texttt{vpaddsw}}\footnote{Vector saturated add for \texttt{int16\_t}}
+or
+\hl{\texttt{vpmulhw}}\footnote{Vector multiple higher half bits for \texttt{int16\_t}} 
+is required, followed with 2 or 3 comparison, shuffling and branch instructions:
+\hlc[cyan!60]{\texttt{vpsraw}}\footnote{Shift packed data right arithmetic},
+\hlc[cyan!60]{\texttt{vpcmpneqw}}\footnote{Compare packed data for equal}
+and 
+By enabling
+\hlc[cyan!60]{\texttt{kord}}\footnote{Bitwise logical OR masks}. 
+overflow checking, it brings  4x or 5x more instruction count and 60\% more
+runtime \cite{FPL2}. \hl{(TODO: verify this number?)}
+
+\begin{center}
+\begin{table}[ht]
+
+\begin{tabular}{  c  L{5.5cm} L{5.5cm}  } 
+     & Addition & Multiplication \\ 
+    \midrule
+        Disabled 
+    & 
+        \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}} 
+    &
+        \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}} \\
+    \midrule
+        Enabled 
+    &
+        \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}}
+        \hl{\texttt{vpaddsw \%zmm2,\%zmm4,\%zmm2}}
+        \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm2,\%k1}}
+        \hlc[cyan!60]{\texttt{kord \%k1,\%k0,\%k0}}
+    &  
+        \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}}
+        \hl{\texttt{vpmulhw \%zmm1,\%zmm3,\%zmm3}}
+        \hlc[cyan!60]{\texttt{vpsraw \$0xf,\%zmm2,\%zmm5}}
+        \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
+        \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}} \\
+  \end{tabular}
+  \caption{\hl{(TODO: write caption)}}
+  \label{table:i16-instr}
+\end{table}
+\end{center}
+
+\subsubsection{Implementation of scalar \texttt{int32\_t} and \texttt{int64\_t}
+overflow checking} 
+
+Clang's language extension provides functions to perform overflow-checked
+integer arithmetics: 
+\begin{VerbatimCompact}
+bool __builtin_add_overflow (type1 x, type2 y, type3 *sum);
+bool __builtin_mul_overflow (type1 x, type2 y, type3 *prod);
+\end{VerbatimCompact}
+These functions take three arguments: \texttt{x} and \texttt{y} are the two
+input operands, and \texttt{sum} or \texttt{prod} is a pointer to the variable
+that will hold the result of the addition or multiplication. The return value of
+these functions is a boolean that indicates whether an overflow occurred during
+the operation.
+
+\subsubsection{Performance comparison}
+\hl{TODO: write benchmark and plot! I have not done such benchmark ever}
 
 \subsection{Overflow checking for floating points}
 Integers and floating points have distinct mechanisms for overflow checking
