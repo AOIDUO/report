@@ -1270,11 +1270,11 @@ hot loop is completely vectorized, and clang dispatches 128-bit SSE instructions
 for occasional scalar operations. This is because the SSE execution units can
 handle both single and double precision floating point arithmetic natively,
 whereas the legacy x87 floating-point instructions operates on an 80-bit
-internal format, requiring additional conversions. Using SSE instructions
-reduces register pressure as well. The SSE units can leverage 16 XMM registers,
-but for x87 units there are only 8 floating point registers available. There
-could be even 32 XMM registers if such extension is implemented in the
-micro-architecture~\cite{x87-bad}. 
+internal format, requiring additional conversions and delay. Using SSE
+instructions reduces register pressure as well. The SSE units can leverage 16
+XMM registers, but for x87 units there are only 8 floating point registers
+available. There could be even 32 XMM registers if such extension is implemented
+in the micro-architecture~\cite{x87-bad}. 
 
 
 The benchmark, as illustrated in Figure \ref{TODO}, evaluates the performance of

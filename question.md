@@ -24,4 +24,4 @@ a math library ... -->
 - fix citation, use `~` for cites 
 - fix number
 - ignore integration into mlir?
-- explain x87
+<!-- - explain x87 -->
