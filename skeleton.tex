@@ -16,9 +16,11 @@
 \usepackage{float}
 
 \newcommand{\sigfpe}{\texttt{SIGFPE} }
+\newcommand{\dthalfi}{\texttt{int10\char`_t} }
 \newcommand{\dtshort}{\texttt{int16\char`_t} }
 \newcommand{\dtint}{\texttt{int32\char`_t} }
 \newcommand{\dtlong}{\texttt{int64\char`_t} }
+\newcommand{\dthalf}{\texttt{half} }
 \newcommand{\dtfloat}{\texttt{float} }
 \newcommand{\dtdouble}{\texttt{double} }
 \newcommand{\feinexact}{\texttt{FE\char`_INEXACT} }
@@ -149,29 +151,28 @@ from the Informatics Research Ethics committee.
 
 
 \begin{acknowledgements}
-    First and foremost, I would like to express my deepest gratitude to my
-    supervisor, Tobias Grosser, for his unwavering support, guidance, and
-    encouragement throughout the course of this research. His extensive
-    knowledge, valuable insights, and patience have been instrumental in shaping
-    my academic and personal growth.
+% First and foremost, I would like to express my deepest gratitude to my
+% supervisor, Tobias Grosser, for his unwavering support, guidance, and
+% encouragement throughout the course of this research. His extensive knowledge,
+% valuable insights, and patience have been instrumental in shaping my academic
+% and personal growth.
 
-    I am also immensely grateful to Arjun Pitchanathan, a fellow Ph.D. student
-    under the supervision of Tobias Grosser, for his invaluable assistance and
-    collaboration. His expertise, constructive feedback, and willingness to
-    share his knowledge have significantly contributed to the progress and
-    quality of this work.
-    
-    Furthermore, I would like to acknowledge the generous contributions from
-    Marisa Kirisame, Emanon, gjz010, and lyzh, whose insightful comments,
-    technical support, and camaraderie have enriched my research experience.
-    Their shared wisdom and passion for the subject matter have made this
-    journey both enjoyable and rewarding.
-    
-    Finally, I am thankful to all my friends, colleagues, and family members who
-    have provided me with the emotional support and encouragement needed to
-    complete this paper. Their unwavering belief in my abilities has been a
-    source of strength and motivation throughout this challenging process.
-\hl{TODO:}
+% I am also immensely grateful to Arjun Pitchanathan, a fellow Ph.D. student under
+% the supervision of Tobias Grosser, for his invaluable assistance and
+% collaboration. His expertise, constructive feedback, and willingness to share
+% his knowledge have significantly contributed to the progress and quality of this
+% work.
+
+% Furthermore, I would like to acknowledge the generous contributions from Marisa
+% Kirisame, Emanon, gjz010, and lyzh, whose insightful comments, technical
+% support, and camaraderie have enriched my research experience. Their shared
+% wisdom and passion for the subject matter have made this journey both enjoyable
+% and rewarding.
+
+% Finally, I am thankful to all my friends, colleagues, and family members who
+% have provided me with the emotional support and encouragement needed to complete
+% this paper. Their unwavering belief in my abilities has been a source of
+% strength and motivation throughout this challenging process.
 
 \end{acknowledgements}
 
@@ -1339,33 +1340,92 @@ potentially outperform int16.
 \chapter{Pivot}
 
 \section{Implementation and Optimization}
+
+\subsection{Matrix-wise transprecision}
+
 \subsection{Double buffering}
-\subsection{Alignment}
-\subsection{Vector size specialization}
-\subsection{Reduce floating point status register manipulation}
+
+Double buffering is a powerful technique to address the issue of data pollution
+caused by overflown data. When matrix-wise computing is carried out, a potential
+overflow can contaminate the input matrix and write meaningless results into it.
+It is difficult to recover from overflown results, making it impossible to
+dispatch the same input matrix to a algorithm of higher precision and defeating
+the purpose of transprecision computing.
+
+Double buffering addresses this challenge by allocating two distinct pieces of
+memory, one for the input matrix and the other for output matrix. The input
+matrix is read-only, while the output matrix allows both reading and writing.
+This separation of data storage ensures that the input matrix remains unpolluted
+by overflown data and that any potential overflow is encapsulated within the
+separate output matrix. 
+
+While making a copy of the input matrix is a simple and easy solution for
+protecting the original data from pollution, double buffering is a superior
+technique due that it does not introduce additional memory operations. With
+double buffering, every operand requires a load operation from the input matrix,
+and every result takes a store operation to be written into the output matrix.
+This is the minimal amount of memory operation required for arithmetics. For
+512-bit vector registers, Zen4 is capable of loading one vector per cycle and
+storing one vector per two cycles. In comparison, it can do two multiplication
+or addition of 512-bit vectors every cycle. The discrepancy in throughput
+between computing and IO suggests that memory copy very expensive and
+inefficient. 
+
 \subsection{Reduce number of matrix index computation}
+\subsection{Loop unrolling}
+
+\subsection{Alignment}
+
+\subsection{Vector size specialization}
+
+
+
+
 \label{sec:optmz-get-index}
 
 
 \chapter{Conclusion and Future work}
 
-\section{Final Reminder}
+\dthalf is a 16-bit floating point data structure, consistent of 1-bit sign,
+5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). The \dthalfi
+data type can be defined accordingly, and overflow would not occure for xx\% of
+the cases. 
 
-The body of your dissertation, before the references and any appendices,
-\emph{must} finish by page~40. The introduction, after preliminary material,
-should have started on page~1.
+Now \dthalf has already been supported widely on GPUs for AI applications. It
+provides performance benefits over higher precision floating point formats, for
+the exact same reason that extra precisions are a waste of resources, and more
+number can be computed once with a a shorter data type. If 16-bit floating point
+is integrated into future AVX extensions, it would further improve the
+performance of \pivot. It is expected to be slightly slower then the \dtshort
+overflow-ignored version, and the runtime can be reduced to about 50\% comparing
+to the \pivot function implemented using \dtfloat in this report.
 
-You may not change the dissertation format (e.g., reduce the font size, change
-the margins, or reduce the line spacing from the default single spacing). Be
-careful if you copy-paste packages into your document preamble from elsewhere.
-Some \LaTeX{} packages, such as \texttt{fullpage} or \texttt{savetrees}, change
-the margins of your document. Do not include them!
+\begin{figure}
+    \begin{center}
+    \includegraphics[width=50mm,scale=0.1]{image/ieee-f16.png}
+    \end{center}
+    \caption{IEEE 754 half precision floating point (16 bits). \cite{ieee754-diagram}}
+    \label{fig:ieee-f16}
+\end{figure}
 
-Over-length or incorrectly-formatted dissertations will not be accepted and you
-would have to modify your dissertation and resubmit. You cannot assume we will
-check your submission before the final deadline and if it requires resubmission
-after the deadline to conform to the page and style requirements you will be
-subject to the usual late penalties based on your final submission time.
+
+% \section{Final Reminder}
+
+% The body of your dissertation, before the references and any appendices,
+% \emph{must} finish by page~40. The introduction, after preliminary material,
+% should have started on page~1.
+
+% You may not change the dissertation format (e.g., reduce the font size, change
+% the margins, or reduce the line spacing from the default single spacing). Be
+% careful if you copy-paste packages into your document preamble from elsewhere.
+% Some \LaTeX{} packages, such as \texttt{fullpage} or \texttt{savetrees}, change
+% the margins of your document. Do not include them!
+
+% Over-length or incorrectly-formatted dissertations will not be accepted and you
+% would have to modify your dissertation and resubmit. You cannot assume we will
+% check your submission before the final deadline and if it requires resubmission
+% after the deadline to conform to the page and style requirements you will be
+% subject to the usual late penalties based on your final submission time.
 
 \bibliographystyle{plain}
 \bibliography{mybibfile}
