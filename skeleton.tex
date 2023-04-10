@@ -1242,10 +1242,10 @@ the caller will retry computation using \texttt{LargeInteger} accordingly.
 
 
 \subsubsection{Evaluation}
-In x86\_64 there are two status registers for floating points, the x87 status
-register for traditional scalar floating point operation, and the \mxcsr
-register for SSE or AVX instructions. The source code of the library function
-\texttt{fetestexcept} indeed manipulates both registers \cite{fenvlib}: 
+In x86\_64 there are two status registers for floating points, the legacy x87
+status register for traditional scalar floating point operation, and the modern
+\mxcsr register for SSE or AVX instructions. The source code of the library
+function \texttt{fetestexcept} indeed manipulates both registers \cite{fenvlib}: 
 \begin{verbatim}
 int fetestexcept(int excepts) {
     unsigned short status;
@@ -1266,10 +1266,16 @@ int fetestexcept(int excepts) {
 
 In the vectorized floating point scenario, the instruction for x87 status
 register is unnecessary and only the \mxcsr register should be concerned. The
-hot loop is completely vectorized, and for occasional scalar operations, Clang
-dispatches 128-bit vector instructions, because pipeline inside the execution
-units have to be flushed when interleaving between vector and scalar instruction
-(\hl{TODO: really? I don't trust it myself. Also did not find any source})
+hot loop is completely vectorized, and clang dispatches 128-bit SSE instructions
+for occasional scalar operations. This is because the SSE execution units can
+handle both single and double precision floating point arithmetic natively,
+whereas the legacy x87 floating-point instructions operates on an 80-bit
+internal format, requiring additional conversions. Using SSE instructions
+reduces register pressure as well. The SSE units can leverage 16 XMM registers,
+but for x87 units there are only 8 floating point registers available. There
+could be even 32 XMM registers if such extension is implemented in the
+micro-architecture~\cite{x87-bad}. 
+
 
 The benchmark, as illustrated in Figure \ref{TODO}, evaluates the performance of
 \texttt{fenv} functions alongside their respective revised versions. The
