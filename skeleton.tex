@@ -15,6 +15,17 @@
 \usepackage{relsize}
 \usepackage{float}
 
+\newcommand{\sigfpe}{\texttt{SIGFPE} }
+\newcommand{\dtshort}{\texttt{int16\char`_t} }
+\newcommand{\dtint}{\texttt{int32\char`_t} }
+\newcommand{\dtlong}{\texttt{int64\char`_t} }
+\newcommand{\dtfloat}{\texttt{float} }
+\newcommand{\dtdouble}{\texttt{double} }
+\newcommand{\feinexact}{\texttt{FE\char`_INEXACT} }
+\newcommand{\feinvalid}{\texttt{FE\char`_INVALID} }
+\newcommand{\mxcsr}{\texttt{mxcsr} }
+\newcommand{\pivot}{\texttt{pivot} }
+
 \newenvironment{VerbatimCompact}
   {\vspace*{-2.5mm}\VerbatimEnvironment
    \par\Verbatim}
@@ -87,14 +98,14 @@ overflow-checked multiplication and addition on an input matrix of low dimension
 and mostly small value elements. 
 
 The current approach of upstream is element-wise multiplication and addition  on
-transprecision integer matrices, from \texttt{int64\_t} to
+transprecision integer matrices, from \dtlong to
 \texttt{LargeInteger}. This can be improved by efficiently utilizing hardware
 resources, taking advantage of SIMD, and reducing the bit width for every
 element: the compiler is not capable of automatically generating vectorized
-instructions for element-wise transprecision computing, and \texttt{int64\_t}
+instructions for element-wise transprecision computing, and \dtlong
 has a much larger bit width than what is typically used for most of the elements
 in the matrix. Additionally, extra arithmetics are required to perform overflow
-checking for \texttt{int64\_t}, resulting in significant performance overhead.
+checking for \dtlong, resulting in significant performance overhead.
 This report “innovates” the \texttt{int23\_t} \footnote{This is not really a
 innovation. It it a common technique on GPUs because often they are more capable
 on floating points than integers. See Section \ref{sec:introduction} for more
@@ -193,13 +204,13 @@ hardware resources, thereby accelerating the process.
 
 Currently, the source code in MLIR upstream adopts a nested for-loop to iterate
 through every element of the matrix in a transprecision manner. Each number in
-the matrix can either be \texttt{int64\_t} or \texttt{LargeInteger}. The
-algorithm starts by using \texttt{int64\_t}, in case of overflow, it switches to
+the matrix can either be \dtlong or \texttt{LargeInteger}. The
+algorithm starts by using \dtlong, in case of overflow, it switches to
 the \texttt{LargeInteger} version. This approach is computationally expensive
 and inefficient, for the following reasons: 
 \begin{enumerate}
 
-\item \texttt{int64\_t} has a much larger bit width than what is typically
+\item \dtlong has a much larger bit width than what is typically
 used for most of the elements in the matrix,
 
 \item the compiler is not capable of automatically generating vectorized
@@ -234,12 +245,12 @@ detection almost free.
 
 
 opencompl’s fork of LLVM includes a modified version of \texttt{pivot} that
-utilizes \texttt{int16\_t} and is designed for matrices with 32 columns or less \cite{FPL2}.
+utilizes \dtshort and is designed for matrices with 32 columns or less \cite{FPL2}.
 This approach offers the advantage of being able to pack a row of 32 elements
 into a single \texttt{AVX-512} register and addresses issues 1 and 2. However,
 overflow is still checked manually, causing 4x or 5x more instruction count (
 Section \ref{sec:todo}). Moreover, this approach introduces a new disadvantage,
-the support for vectorized \texttt{int16\_t} is very rare among CPU manufactured
+the support for vectorized \dtshort is very rare among CPU manufactured
 in the last decade (Section \ref{sec:todo}). 
 
 An alternative approach is to do 23-bit or 52-bit integer operations using float
@@ -250,7 +261,7 @@ bits for double \footnote{ IEEE 754 specification is introduced in Section
 \ref{sec:todo}}. When the result of some integer computation exceeds the bit
 size of the mantissa, floating point imprecision almost always occurs and a
 status register will be set automatically (Section \ref{sec:todo}). Comparing to
-\texttt{int16\_t}, even though vector size is sacrificed as there does not exist
+\dtshort, even though vector size is sacrificed as there does not exist
 support for 16-bit floating point \texttt{half}, using floating points could
 still potentially be faster, because overflow checking overhead can be
 significantly reduced. With floating points, the cost of overflow checking is
@@ -267,14 +278,14 @@ data structures, element data types and data widths (Section \ref{sec:Toy}).
 
 It is discovered that optimal performance can be achieved by selecting clang
 builtin vector type as vectorization methods and use flat list as matrix data
-structure. However, it is quite difficult to decide whether \texttt{int16\_t} or
-\texttt{float} is better, because the former benefits form bigger vector size
+structure. However, it is quite difficult to decide whether \dtshort or
+\dtfloat is better, because the former benefits form bigger vector size
 and less instruction count, while the latter has minimal overhead on overflow
 checking. 
 
 Then two detached versions of \texttt{pivot} function from the Presburger
 library are built from the most optimal configurations derived form the toy
-example, one using \texttt{int16\_t} and the other using \texttt{float}. Some
+example, one using \dtshort and the other using \dtfloat. Some
 further optimizations were made by inspecting \texttt{perf} reports and
 assembly, including: 
 
@@ -299,7 +310,7 @@ found that most of the constraint matrices are low in dimensionality and small
 in the value of each element. Specifically, more than 99\% of the coefficients
 require less than 10 bits and 95\% of them are less than 20 columns \cite{FPL1}.
 Thus, most of the rows fit inside a 512-bit vector register of 32
-\texttt{int16\_t} elements, and a row operation can be done in a single
+\dtshort elements, and a row operation can be done in a single
 instruction. 
 
 However, in rare and corner cases, there can be larger coefficients up to 127
@@ -309,16 +320,16 @@ backup. Also, the maximum observed column count is 28 and there is not a certain
 maximum column count as well. 
 
 Therefore the FPL paper presents a 3-way transprecision implementation for the
-Presburger library, from row-wise vectorized \texttt{int16\_t} to element-wise
-scalar \texttt{int64\_t} and element-wise scalar \texttt{LargeInteger}, as
+Presburger library, from row-wise vectorized \dtshort to element-wise
+scalar \dtlong and element-wise scalar \texttt{LargeInteger}, as
 illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the MLIR upstream
 only presents a 2-layer transprecision, consisting of element-wise scalar
-operation using \texttt{int64\_t} and \texttt{LargeInteger}. The
-\texttt{int16\_t} version is not merged with the upstream for two reasons: 
+operation using \dtlong and \texttt{LargeInteger}. The
+\dtshort version is not merged with the upstream for two reasons: 
 \begin{compactlist} 
-    \item \texttt{int16\_t} vectors require AVX-512 ISA extension, but hardware
+    \item \dtshort vectors require AVX-512 ISA extension, but hardware
     support are rare (Section \ref{sec:avx512}). 
-    \item Despite the \texttt{int16\_t} version is fast \hl{TODO: find how much
+    \item Despite the \dtshort version is fast \hl{TODO: find how much
     faster in FPL paper}, overflow checking overhead is ??\%\hl{TODO: find how
     much is overhead} \cite{FPL2}. Using floating points could significantly
     reduce this overhead and potentially be faster (Section \ref{sec:i23}).  
@@ -337,7 +348,7 @@ operation using \texttt{int64\_t} and \texttt{LargeInteger}. The
 A recent trend in x86-64 architecture’s development is to include AVX-512
 instruction set architecture (ISA) extension. AVX-512 succeeds AVX2, the vector
 width is increased from AVX-2’s 256 bits to 512 bits. AVX-512 also provides new
-instructions, for example, \texttt{int16\_t} saturated addition.
+instructions, for example, \dtshort saturated addition.
 
 % \subsection{History}
 
@@ -469,7 +480,7 @@ truncated, therefore causing imprecision.
 
 In some rare cases, integers longer than the size of mantissa can be represented
 in floating points precisely. An examples of such numbers are large powers of 2,
-like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \texttt{float}
+like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \dtfloat
 is:
 \begin{VerbatimCompact}
 Sign    : 0
@@ -480,6 +491,14 @@ Despite being greater than the size of
 the mantissa, they are normalized rather then being rounded, and therefore does
 not break the mechanism of representing integer in floating-points.
 
+Throughout history, floating point processing units in GPUs have been utilized
+for fast integer arithmetic, for example, modular exponentiation
+\cite{intfpu-modexp} and RSA algorithms \cite{intfpu-rsa}, because often the
+architecture of GPU prioritizes floating points performance rather than
+integers. 
+\hl{TODO: this paragraph here? or introduction?}
+
+
 \begin{figure}
 \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/0.3004.jpg}
@@ -487,11 +506,6 @@ not break the mechanism of representing integer in floating-points.
     \label{meme}
 \end{center}
 \end{figure}
-
-
-\subsection{Floating point exceptions and Fenv library}
-\label{sec:fpe}
-\hl{Arjun: I feel this is not really background, we are getting into the implementation now}
 
 \section{Google Benchmark}
 Google benchmark is a library to measure the performance of a code snippet. It
@@ -598,9 +612,9 @@ or vector FMA with various setups, including:
         \end{compactlist}
     \item Element data width
         \begin{compactlist} 
-            \item 16 bits: \texttt{int16\_t}
-            \item 32 bits: \texttt{int32\_t}, \texttt{float}
-            \item 64 bits: \texttt{int64\_t}, \texttt{double}
+            \item 16 bits: \dtshort
+            \item 32 bits: \dtint, \dtfloat
+            \item 64 bits: \dtlong, \dtdouble
         \end{compactlist}
     \item Element data type 
         \begin{compactlist} 
@@ -658,7 +672,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
 After compiling on a AVX-512 enabled computer and disassembling the binary, it
-is observed that clang automatically packs 16 \texttt{float} (512 bits) as a
+is observed that clang automatically packs 16 \dtfloat (512 bits) as a
 operand of the \texttt{VADDPS} instruction. 
 
 Alternatively, vectorization could be disabled by adding the \texttt{-mno-avx
@@ -813,11 +827,11 @@ void vec_fma(float* src1_ptr, float* src2_ptr,
 In some cases clang could be even worse, it may fail to recognize vectorization
 patterns from element-wise loop operations, leading to more reduction in
 performance. In the \texttt{vec\_fma} example, by changing the type signature
-from \texttt{float} to \texttt{int}, clang decides to dispatch scalar
+from \dtfloat to \texttt{int}, clang decides to dispatch scalar
 instructions for addition (\texttt{add}) and multiplication (\texttt{imul})
 completely (Listing \ref{vec-fma-int-auto}). Their vectorized equivalency
 \texttt{vpaddd} and \texttt{vpmulld} are more performant options. (Listing
-\ref{vec-fma-int-auto}).
+\ref{vec-fma-int-vecty}).
 
 \begin{table}[ht]\captionsetup{name=Listing}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
@@ -906,7 +920,7 @@ void vec_fma(int* src1_ptr, int* src2_ptr,
 The most intuitive data structure of a matrix is a list of lists, where each
 list represents a row and a list of rows is a matrix. In C++ this can be
 represented using \texttt{std::vector<std::vector<T>>}, where \texttt{T} could
-be \texttt{float}, \texttt{double}, \texttt{int32\_t}, etc. The std::vector
+be \dtfloat, \dtdouble, \dtint, etc. The std::vector
 class provides an intuitive interface for accessing and modifying elements,
 making it easy to write code with. 
 
@@ -1003,6 +1017,7 @@ function can be optimized to only compute index once (See Section
 
 
 \subsection{Width}
+\label{sec:width} 
 Since the numbers stored in the matrix are almost always less than 10 bits,
 using shorter data types can be more advantageous than longer ones because they
 allow more numbers to be packed into a single vector register (Table
@@ -1012,9 +1027,8 @@ time. Given that the Zen4 micro-architecture provides approximately same amount
 of execution units for both integers and floating points, it is reasonable to
 estimate that the execution time is inversely proportional to the bit width of
 data type. As confirmed in Plot \ref{fig:col8-col16-col32-i16-i32-f32-f64},
-\texttt{int32\_t} and \texttt{float} costs nearly same amount of time, while
-\texttt{int32\_t} and \texttt{double} costs double the amount of time than
-\texttt{int16\_t} and \texttt{float} respectively.
+\dtint and \dtfloat costs nearly same amount of time, while \dtint and \dtdouble
+costs double the amount of time than \dtshort and \dtfloat respectively.
 
 
 \begin{figure}[H]
@@ -1023,13 +1037,16 @@ data type. As confirmed in Plot \ref{fig:col8-col16-col32-i16-i32-f32-f64},
     \label{fig:col8-col16-col32-i16-i32-f32-f64}
 \end{figure}
 
-\begin{figure}[H]\captionsetup{name=}
+\hl{TODO: fix Table number}
+\begin{figure}[H]\captionsetup{name=Table}
     \includegraphics[width=\linewidth]{image/arch-table.png}
-    \caption{\hl{TODO: write caption}}
+    \caption{A summary for features provided by the Zen4 micro-architecture
+    for different data types \cite{Zen4Critique} \cite{Zen2ChipWiki}.}
     \label{archtable}
 \end{figure}
 
 \subsection{Overflow checking for integers}
+\label{sec:overflow-int}
 
 The x86-64 micro-architecture provides the \texttt{seto} instruction to set some
 byte to \texttt{1} if overflow occurred as a result of integer arithmetic.
@@ -1042,18 +1059,18 @@ carried out on each element individually in a scalar manner,resulting in even
 worse performance. 
 
 
-% One advantage of using \texttt{int16\_t} is that it can be used with AVX-512's
+% One advantage of using \dtshort is that it can be used with AVX-512's
 % saturated add and multiply higher bits vector instructions, which are listed in
 % Table \ref{archtable}. This allows for the creation of vectorized code that
 % takes overflow into account and is therefore more efficient. However, it should
 % be noted that there are no equivalent instructions for \texttt{int32_t} and
 % \texttt{int64_t}.
 
-One advantage of \texttt{int16\_t} is that it can be used with AVX-512's
+One advantage of \dtshort is that it can be used with AVX-512's
 saturated add and multiply higher bits vector instructions (Table
 \ref{archtable}), making it possible and convenient to write vectorized and
 overflow-aware code. However, Zen4's implementation of AVX-512 extension does
-not provide equivalent instruction for \texttt{int32\_t} or \texttt{int64\_t},
+not provide equivalent instruction for \dtint or \dtlong,
 and therefore must be processed as scalar values.
 % When the
 % result of a conventional add does not match the result of a saturated add, or
@@ -1061,12 +1078,11 @@ and therefore must be processed as scalar values.
 % overflow. 
 
 
-% \subsection{Implementation of detecting overflow for \texttt{int16\_t} }
-\subsubsection{Implementation of vectorized \texttt{int16\_t} overflow checking}
+\subsubsection{Implementation of vectorized \dtshort overflow checking}
 By comparing the result of a conventional addition and saturated addition, it
 indicates whether an addition has gone overflown or not. In case of overflow,
 with saturated add, the result always retains at the maximum possible value of
-\texttt{int16\_t}: \texttt{0x7FFF}, while the result of a conventional add is
+\dtshort: \texttt{0x7FFF}, while the result of a conventional add is
 always smaller, because the overflowed output from conventional addition can't
 go all the way around and become \texttt{INT16\_MAX} again. In the two's
 complement binary form for integer, the overflow sum is "trapped" in the
@@ -1085,14 +1101,14 @@ the upper 16 bits are set.
 Inspecting these approaches from a instruction-level perspective (Table
 \ref{table:i16-instr}), when overflow is ignored, both add and multiply takes 1
 instruction, 
-\hlc[pink]{\texttt{vpaddw}}\footnote{Vector add for \texttt{int16\_t}} 
+\hlc[pink]{\texttt{vpaddw}}\footnote{Vector add for \dtshort} 
 and 
-\hlc[pink]{\texttt{vpmullw}}\footnote{Vector multiply lower half bits for \texttt{int16\_t}}. 
+\hlc[pink]{\texttt{vpmullw}}\footnote{Vector multiply lower half bits for \dtshort}. 
 To obtain and process overflow-related
 information, an additional computation instruction
-\hl{\texttt{vpaddsw}}\footnote{Vector saturated add for \texttt{int16\_t}}
+\hl{\texttt{vpaddsw}}\footnote{Vector saturated add for \dtshort}
 or
-\hl{\texttt{vpmulhw}}\footnote{Vector multiple higher half bits for \texttt{int16\_t}} 
+\hl{\texttt{vpmulhw}}\footnote{Vector multiple higher half bits for \dtshort} 
 is required, followed with 2 or 3 comparison, shuffling and branch instructions:
 \hlc[cyan!60]{\texttt{vpsraw}}\footnote{Shift packed data right arithmetic},
 \hlc[cyan!60]{\texttt{vpcmpneqw}}\footnote{Compare packed data for equal}
@@ -1131,10 +1147,8 @@ runtime \cite{FPL2}. \hl{(TODO: verify this number?)}
   \label{table:i16-instr}
 \end{table}
 \end{center}
-
-\subsubsection{Implementation of scalar \texttt{int32\_t} and \texttt{int64\_t}
+\subsubsection{Implementation of scalar \dtint and \dtlong
 overflow checking} 
-
 Clang's language extension provides functions to perform overflow-checked
 integer arithmetics: 
 \begin{VerbatimCompact}
@@ -1146,16 +1160,186 @@ input operands, and \texttt{sum} or \texttt{prod} is a pointer to the variable
 that will hold the result of the addition or multiplication. The return value of
 these functions is a boolean that indicates whether an overflow occurred during
 the operation.
+\subsubsection{Evaluation}
+\hl{TODO: I have not done this benchmark before}
+Compare how fast is the following:
+\small
 
-\subsubsection{Performance comparison}
-\hl{TODO: write benchmark and plot! I have not done such benchmark ever}
+\begin{compactlist}
+    \item overflow-checked, vectorized, int16
+    \item overflow-ignored, vectorized, int16
+    \item overflow-checked, scalar, int32
+    \item overflow-ignored, vectorized, int32
+    \item overflow-checked, scalar, int64
+    \item overflow-ignored, vectorized, int64
+\end{compactlist}
+\normalsize
 
 \subsection{Overflow checking for floating points}
-Integers and floating points have distinct mechanisms for overflow checking
+\label{sec:overflow-float}
+To detect floating point overflow or imprecision, one approach is to enable
+floating point imprecision as a trap, then upon overflow, the interrupt \sigfpe
+is raised and the PC (program counter) will be redirected to its handler. The
+method can be programmed by using useful functions from the \texttt{fenv}
+library as follow \cite{fenvlib}:
+\begin{verbatim}
+void signal_handler(int signal) {
+    // handle fpe
+}
+
+void function() {
+    std::signal(SIGFPE, signal_handler);
+    std::feclearexcept (FE_ALL_EXCEPT);
+    feenableexcept (FE_INEXACT | FE_INVALID);
+    // do something
+    fedisableexcept (FE_INEXACT | FE_INVALID);
+}
+\end{verbatim}
+
+In the \texttt{function()} block, first the \texttt{std::signal()} function is
+called to register the signal handler function for the \sigfpe interrupt. Next,
+the \texttt{std::feclearexcept()} function is called to clear any previously set
+exception flags in the status register. Then, \feinexact and \feinvalid is
+passed to the \texttt{feenableexcept()} function to enable inexactness and
+invalid exceptions. Once the floating-point exceptions are enabled, some
+computation can be performed. If some operation produces an inexact or invalid
+floating point number, \sigfpe is raised and a call to
+\texttt{signal\char`_handler} is triggered. After the computation is completed,
+the \texttt{fedisableexcept()} function is called to disable the previously
+enabled exceptions. 
+
+But it is difficult to recover back from \sigfpe. By design, the propose usage
+of \sigfpe is to do some cleanup in the handler function, then exit the program
+gracefully. If the handler does not exit the program, after returning from the
+handler, the PC always points back to the instruction that caused \sigfpe and
+triggers \sigfpe again! However the goal is to discard the current progress and
+continue the program by using the LargeInteger algorithm. Although there could
+be potential workarounds, such as modifying the call stack and changing the
+return address, but implementing these solutions can be challenging, and
+introduces significant complexity to the codebase.
+
+Alternatively we may read status registers and check if the imprecision bit is
+set: 
+\begin{verbatim}
+bool function(matrix & tableau) {
+    std::feclearexcept (FE_ALL_EXCEPT);
+    if (fetestexcept(FE_INEXACT | FE_INVALID)) {
+        // false for overflow, will be handle by its caller
+        return false; 
+    } return true; // true for safe
+}
+\end{verbatim}
+
+Instead of registering floating point imprecision as interrupts, it clears the
+floating point status register and reads it afterwards using the
+\texttt{fetestexcept()} function, to check whether imprecision has ever occurred
+in previous computations. It then returns a boolean value to notify its caller
+whether or not the test for floating-point exceptions is positive, \texttt{true}
+for safe and \texttt{false} for overflown. In case of returning \texttt{false}, 
+the caller will retry computation using \texttt{LargeInteger} accordingly. 
+
+
+
+\subsubsection{Evaluation}
+In x86\_64 there are two status registers for floating points, the x87 status
+register for traditional scalar floating point operation, and the \mxcsr
+register for SSE or AVX instructions. The source code of the library function
+\texttt{fetestexcept} indeed manipulates both registers \cite{fenvlib}: 
+\begin{verbatim}
+int fetestexcept(int excepts) {
+    unsigned short status;
+    unsigned int mxcsr;
+
+    excepts &= FE_ALL_EXCEPT;
+
+    /* Store the current x87 status register */
+    __asm__ volatile ("fnstsw %0" : "=am" (status));
+
+    /* Store the MXCSR register state */
+    __asm__ volatile ("stmxcsr %0" : "=m" (mxcsr));
+
+    return ((status | mxcsr) & excepts);
+}
+\end{verbatim}
+
+
+In the vectorized floating point scenario, the instruction for x87 status
+register is unnecessary and only the \mxcsr register should be concerned. The
+hot loop is completely vectorized, and for occasional scalar operations, Clang
+dispatches 128-bit vector instructions, because pipeline inside the execution
+units have to be flushed when interleaving between vector and scalar instruction
+(\hl{TODO: really? I don't trust it myself. Also did not find any source})
+
+The benchmark, as illustrated in Figure \ref{TODO}, evaluates the performance of
+\texttt{fenv} functions alongside their respective revised versions. The
+modifications involves restricting operations solely
+to the manipulation of either the x87 status register or the \mxcsr register. 
+It indicates that it is significantly faster if we remove x87 status register
+related operations. 
+
+\hl{TODO: plot this}
+\small
+\begin{compactlist}
+\item fetestexcept                           8.15 ns
+\item fetestexcept\_x87                       4.33 ns
+\item fetestexcept\_mxcsr                     4.55 ns
+\item feclearexcept                          49.3 ns
+\item feclearexcept\_local\_x87                45.5 ns
+\item feclearexcept\_mxcsr                    9.42 ns
+% \item fetestexcept\_feclearexcept\_mxcsr       13.8 ns
+\end{compactlist}
+\normalsize
+
+\subsection{Comparing \dtshort and \dtfloat}
+
+Section \ref{sec:width}, \ref{sec:overflow-int} and \ref{sec:overflow-float}
+have concluded that \dtshort is superior than any other integer data types and
+\dtfloat is better than \dtdouble. 
+
+% even
+% though \dtshort is the fastest on this particular matrix size
+
+Benchmark (Figure \ref{fig:i16-f32}) on the toy example reveals that \dtshort's
+spends a considerably higher percentage of runtime on overflow checking,
+compared with the floating point data types. This is consistent with the
+reasoning from previous chapters, where overhead for \dtfloat is a one-time
+expense, but for \dtshort it is always a portion of the total runtime. 
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{image/i16-f32.png}
+    \caption{\hl{TODO: replot and remove double}}
+    \label{fig:i16-f32}
+\end{figure}
+
+It is worth noting that even though \dtshort is faster than \dtfloat in this
+benchmark, it is not sound to conclude that the \texttt{pivot} function
+implemented in \dtshort will be faster than \dtfloat. The toy example is
+different from the \pivot function in many aspects, for example, number of
+memory load operations. In case of the actual pivot function, float may
+potentially outperform int16. 
+
+% \begin{verbatim}
+% bool function(matrix & tableau) {
+%     // do something
+%     if (fetestexcept(FE_INEXACT | FE_INVALID)) {
+%     return false; // false for overflow, will be handle by its caller
+%     } return true; // true for safe
+% }
+
+% void caller(){
+%     ...
+%     std::feclearexcept (FE_ALL_EXCEPT);
+%     if (!function(tableau)) {
+%         // overflow! retry with bigger precision algorithm
+%     }
+% }
+% \end{verbatim}
+
 
 \chapter{Pivot}
 
-\section{Optimization}
+\section{Implementation and Optimization}
+\subsection{Double buffering}
 \subsection{Alignment}
 \subsection{Vector size specialization}
 \subsection{Reduce floating point status register manipulation}
@@ -1163,7 +1347,7 @@ Integers and floating points have distinct mechanisms for overflow checking
 \label{sec:optmz-get-index}
 
 
-\chapter{Conclusions}
+\chapter{Conclusion and Future work}
 
 \section{Final Reminder}
 
