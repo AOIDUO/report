@@ -463,7 +463,7 @@ precision (float) and 64-bit double precision (double). For each format, it
 specifies how many bits are used to represent the sign, exponent, and mantissa. 
 
 For float and double, the sign bit is a single bit that indicates whether the
-number is positive or negative. As figure \ref{fig:ieee-f32} shows, there are 8
+number is positive or negative. As Figure \ref{fig:ieee-f32} shows, there are 8
 bits and 11 bits for exponent in float and double respectively, to represent
 represents the order of magnitude. The remaining 23 bits in float and 52 bits in
 double are mantissae, to store the fractional part of the number. The value of a
@@ -473,13 +473,28 @@ where \begin{math}s\end{math} is sign, \begin{math}e\end{math} is exponent,
 \begin{math}f\end{math} is mantissa and \begin{math}B\end{math} is a constant bias
 value: \begin{math}127\end{math} for float, \begin{math}1023\end{math} for double. 
 
+Figure \ref{fig:ieee-f32} provides an example of \dtfloat{} by presenting
+\texttt{0.15625} in binary form:
+\begin{VerbatimCompact}
+sign     = 0b0        -> 0
+exponent = 0b01111100 -> 0b01111100 - 127 = 124 - 127 = -3
+mantissa = 0b01       -> 0b1.01 = 1.25
+\end{VerbatimCompact}
+Substituting the sign, exponent and mantissa into the formula, we get: \\
+\texttt{-1\^{}0 * 2\^{}(-3) * 1.25 = 0.15625}.
+
+
 
 \begin{figure}
-    \includegraphics[width=\linewidth]{image/ieee-f32.png}
-    \includegraphics[width=\linewidth]{image/ieee-f64.png}
-    \caption{IEEE 754 single (32 bits) and double (64 bits) precision floating
-    point. \cite{ieee754-diagram}}
-    \label{fig:ieee-f32}
+    \begin{center}
+        \captionsetup{justification=centering}
+        \includegraphics[width=\linewidth]{image/ieee-f32.png}
+        \includegraphics[width=\linewidth]{image/ieee-f64.png}
+        \caption{Diagrams of IEEE 754 single (32 bits) and double (64 bits)
+        precision floating point \cite{ieee754-diagram}. In some literature
+        ``mantissa'' is referred as ``fraction''.}
+        \label{fig:ieee-f32}
+    \end{center}
 \end{figure}
 
 \subsection{Fused-multiply-add}
@@ -540,9 +555,9 @@ in floating points precisely. An examples of such numbers are large powers of 2,
 like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \dtfloat{}
 is:
 \begin{VerbatimCompact}
-Sign    : 0
-Exponent: 10011011
-Mantissa: 00000000000000000000000
+Sign     = 0
+Exponent = 10011011
+Mantissa = 0
 \end{VerbatimCompact}
 Despite being greater than the size of
 the mantissa, they are normalized rather then being rounded, and therefore does
