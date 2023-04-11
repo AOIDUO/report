@@ -301,18 +301,66 @@ assembly, including:
 
 
 \chapter{Background}
+\section{Linear Programming and Simplex Algorithm}
+Linear programming is a mathematical optimization technique used to model and
+find the best possible solution to a problem, given a set of constraints and an
+objective function to maximize or minimize. Its canonical form consists of a
+maximizing the objective function:
+\begin{math}
+Z = c_1x_1 + c_2x_2 + ... + c_nx_n
+\end{math}, subjecting to the constraints: \\
+\begin{math}
+x_1 \, ... \, x_n \ge 0
+\end{math}\\
+\begin{math}
+a_{11}x_1 + a_{12}x_2 + ... + a_{1n}x_n = b_1 
+\end{math}\\
+\begin{math}
+a_{21}x_1 + a_{22}x_2 + ... + a_{2n}x_n = b_2
+\end{math}\\
+\begin{math}
+...
+\end{math}\\
+\begin{math}
+a_{m1}x_1 + a_{m2}x_2 + ... + a_{mn}x_n = b_m
+\end{math}, \\
+where \begin{math}x_1 \,...\, x_n\end{math} are the variables, 
+\begin{math}c_1 \,...\, c_n\end{math} are the coefficients of the objective function, 
+and non-negative \begin{math}a_{11}, a_{12} \,...\, a_{21} \,...\ a_{m1} \,...\, a_{mn}\end{math}
+together with \begin{math}b_1 \,...\, b_m\end{math} encodes the constraints of
+the problem in a matrix. 
+
+% in a matrix of \begin{math}m\end{math} rows and
+% \begin{math}n+1\end{math} columns \cite{FPL1}.
+
+https://people.richland.edu/james/ictcm/2006/simplex.html
+
+\hl{TODO: i am not sure how correct it is}
+
+The simplex method is an iterative approach that moves from one vertex of the
+feasible solution space to another, always improving the objective function 
+until the optimal solution is reached. The algorithm involves two main steps: 
+pivot operations and determining the entering and leaving variables.
+
+
+
+
+
+% The Simplex method is a widely-used
+% algorithm for solving linear programming problems.
+
+
 \section{Presburger library}
 % \subsection{Overview}
 
-The FPL paper obtained 465,460 representative linear problems encountered during
-integer set coalescing by analyzing linear programs in cache analytical
+The Fast Presburger Library (FPL) paper collected 465,460 representative linear
+problems encountered during analyzing linear programs in cache analytical
 modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
 in the value of each element. Specifically, more than 99\% of the coefficients
 require less than 10 bits and 95\% of them are less than 20 columns \cite{FPL1}.
-Thus, most of the rows fit inside a 512-bit vector register of 32
-\dtshort elements, and a row operation can be done in a single
-instruction. 
+Thus, most of the rows fit inside a 512-bit vector register of 32 \dtshort
+elements, and a row operation can be done in a single instruction. 
 
 However, in rare and corner cases, there can be larger coefficients up to 127
 bits. Practically, the upper bound of coefficient size is unknown, making it
@@ -585,12 +633,14 @@ consistent results:
 
 \section{\texttt{llvm-mca}}
 
-\texttt{llvm-mca}, LLVM Machine Code Analyzer, is a tool to analyze performance of
-executing some instructions on a specific CPU micro-architecture, according to
-scheduling information provided by LLVM \cite{llvm-mca}. This tool may help with predicting and
-explaining performance characteristics \hl{TODO: Is it necessary to mention mca?
-Only use case is I found it not helpful}
+\texttt{llvm-mca}, LLVM Machine Code Analyzer, is a tool to analyze performance
+of executing some instructions on a specific CPU micro-architecture, according
+to scheduling information provided by LLVM \cite{llvm-mca}. This tool help with
+predicting and explaining performance characteristics \hl{TODO: Is it necessary
+to mention mca? Only use case is I found it not helpful}
 
+
+and reason about why clang gives a certain selection of instructions. 
 
 \chapter{Experiments with Toy Example}
 \label{sec:Toy}
@@ -1318,12 +1368,11 @@ expense, but for \dtshort it is always a portion of the total runtime.
     \label{fig:i16-f32}
 \end{figure}
 
-It is worth noting that even though \dtshort is faster than \dtfloat in this
-benchmark, it is not sound to conclude that the \texttt{pivot} function
-implemented in \dtshort will be faster than \dtfloat. The toy example is
-different from the \pivot function in many aspects, for example, number of
-memory load operations. In case of the actual pivot function, float may
-potentially outperform int16. 
+Note that even though \dtshort is faster than \dtfloat in this benchmark, it is
+not sound to conclude that the \texttt{pivot} function implemented in \dtshort
+will be faster than \dtfloat. The toy example is different from the \pivot
+function in many aspects, for example, number of memory load operations. In case
+of the actual pivot function, float may potentially outperform int16. 
 
 % \begin{verbatim}
 % bool function(matrix & tableau) {
@@ -1347,9 +1396,9 @@ potentially outperform int16.
 
 \section{Implementation and Optimization}
 
-\subsection{Matrix-wise transprecision}
+% \subsection{Matrix-wise transprecision}
 
-\subsection{Double buffering}
+\subsection{Matrix-wise transprecision and Double buffering}
 
 Double buffering is a powerful technique to address the issue of data pollution
 caused by overflown data. When matrix-wise computing is carried out, a potential
