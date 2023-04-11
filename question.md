@@ -5,14 +5,13 @@
 - Note: my current fastest impl with float is ~25 ns using ymm, for col 24
 
 ## TODO high priority 
-- in background,  write a chapter about simplex algorithm and what does pivot do
-- finish pivot optimization 
-- fix abstract, dont talk about: fpl, simplex ..., say "a math library "
-- write captions
-- make plot
-- fix number
-- rewrite abstract, ignore integration into mlir?
+- in background, write a chapter about simplex algorithm and what does pivot do
 - fix cite
+- fix number
 
 ## TODO low priority
-- fix avx-512
+- make plot
+- write captions
+- finish pivot optimization section
+- confirm abstract
+- confirm title

@@ -23,6 +23,7 @@
 \newcommand{\dtlong}{\texttt{int64\char`_t}}
 \newcommand{\dthalf}{\texttt{half}}
 \newcommand{\dtfloat}{\texttt{float}}
+\newcommand{\dtfloati}{\texttt{int23\char`_t}}
 \newcommand{\dtdouble}{\texttt{double}}
 \newcommand{\feinexact}{\texttt{FE\char`_INEXACT}}
 \newcommand{\feinvalid}{\texttt{FE\char`_INVALID}}
@@ -70,7 +71,8 @@
 \begin{document}
 \begin{preliminary}
 
-\title{Efficient MLIR Compiler Design: Vectorization for Presburger Library}
+\title{Fast \pivot{} Function for Presburger Library through Vectorization and
+Integer Arithmetic in FPU}
 
 \author{Zhou Qi}
 
@@ -100,43 +102,36 @@
 \abstract{
 \label{sec:abstract}
 
-This report presents a fast implementation for the core \texttt{pivot}
-function of MLIR’s presburger library. Its hot loop is element-wise
-overflow-checked multiplication and addition on an input matrix of low dimension
-and mostly small value elements. 
-
-The current approach of upstream is element-wise multiplication and addition  on
-transprecision integer matrices, from \dtlong{} to
-\texttt{LargeInteger}. This can be improved by efficiently utilizing hardware
-resources, taking advantage of SIMD, and reducing the bit width for every
-element: the compiler is not capable of automatically generating vectorized
-instructions for element-wise transprecision computing, and \dtlong{}
-has a much larger bit width than what is typically used for most of the elements
-in the matrix. Additionally, extra arithmetics are required to perform overflow
-checking for \dtlong{}, resulting in significant performance overhead.
-This report “innovates” the \texttt{int23\_t} \footnote{This is not really a
-innovation. It it a common technique on GPUs because often they are more capable
-on floating points than integers. See Section \ref{sec:introduction} for more
-history and detail. } datatype, a 23-bit integer datatype that utilizes the
-23-bit mantissa of a 32-bit floating point, to address these issues. The faster
-“pivot” performs matrix-wise transprecision computing, targeting 99\% \hl{TODO:
-confirm this number} of the case where elements fit inside \texttt{int23\_t}.
-Overflow awareness overhead is almost free, as floating point imprecision
-implies \texttt{int23\_t} overflow (See Section \ref{sec:todo}) and can be
-captured by a status register. It takes as low as 1 ns to check the status
-register in the pipeline, and only takes 9 ns to reset the status register.
-Additionally the status register is only cleared once before a sequence of
-\texttt{pivot} calls, making the average cost of clearing the status register
-per \texttt{pivot} negligible.  
-    
-On a 30-row by 16-column example matrix, it performs 30 times faster than the
-upstream scalar implementation. The time cost of a single \texttt{pivot} call is
-reduced from 550 ns to 18.6 ns. \hl{TODO: replace this with actual MLIR benchmark
-result}
+This report presents a fast implementation for the core function \pivot{} of a
+math library in MLIR by performing vectorized integer arithmetics in
+FPU. The hot loop of the \pivot{} function performs overflow-checked
+multiplication and addition on each element of an input matrix of low dimension
+and mostly small value items. MLIR's upstream uses element-wise
+transprecision, from \dtlong{} to \texttt{LargeInteger}. 
+This can be improved if hardware resources are utilized effectively, by taking
+advantage of SIMD, and reducing the bit width for every element. 
+The current approach cannot be automatically vectorized by compiler,
+and \dtlong{} has a much larger bit width than what is
+typically used for most of the items in the matrix.
+Additionally, extra arithmetics are required to perform overflow checking 
+for \dtlong{}, resulting in significant performance overhead. 
+This report ``innovates'' the
+\dtfloati{}\footnote{This is not really a innovation. It it a common
+technique on GPUs because often they are more capable on floating points than
+integers. See Section \ref{sec:introduction} for more history and detail. }
+datatype, a 23-bit integer datatype that utilizes the 23-bit mantissa of a
+32-bit floating point, to address these issues. 
+\texttt{int23\_t} overflow can be captured as floating point imprecision by a
+status register, and the cost of reading the status register can be as low as 1
+ns, making overflow awareness almost free.  
+On the selected 30-row by 16-column representative input matrix, the runtime of
+is reduced from 550 ns to 25 ns, achieving 22 times speedup.
 
 \hl{TODO:Question: mention int16 here?}
 
-\hl{TODO:Reminder: we don't use int16 for (1) compatibility (2) only slightly faster than float}
+\hl{TODO:Question: 16-column is not representative!}
+
+\hl{Reminder: we don't use int16 for (1) bad compatibility (2) it is not significanlty faster than float}
 
 }
 
@@ -234,7 +229,7 @@ following conditions:
 \begin{enumerate}
 
 \item Utilize SIMD: preliminary benchmarks (Section
-\ref{sec:vectorization-method}) indicate 8x \hl{TODO: verify this number}
+\ref{sec:vectorization-method-eval}) indicate 8x \hl{TODO: verify this number}
 performance improvement on a simple vector element-wise add example. 
 
 \item Use small bit width for every element: reducing bit width by half doubles the
@@ -541,7 +536,7 @@ capable to do FMUL, FADD, and FSUB as well:
 \end{compactlist} 
 
 This is a useful feature in many numerical computations that involve
-simultaneous multiplication and addition operations, such as dot product and
+simultaneous multiplication and addition operations, such as dot produpreliminaryct and
 matrix multiplication. Since the \pivot{} function performs multiplication and
 addition between the pivot row, some constant value and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
@@ -972,6 +967,7 @@ complicated to code with vector types.}
 \label{vec-add-float-vecty}
 \end{table}
 \subsection{Evaluation}
+\label{sec:vectorization-method-eval}
 When comparing the performance of code written with and without the vector type
 and examining their assembly, it has been discovered that the the automatic
 vectorization feature in clang can be unpredictable and may lead to undesired
