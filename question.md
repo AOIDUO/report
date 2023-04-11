@@ -15,7 +15,8 @@ a math library ... -->
 
 
 ## TODO: 
-- finish llvm-mca
+<!-- - finish llvm-mca -->
+<!-- - explain x87 -->
 - finish pivot section
 - in background,  write a chapter about simplex algorithm and what does pivot do
 - fix abstract
@@ -24,4 +25,3 @@ a math library ... -->
 - fix citation, use `~` for cites 
 - fix number
 - ignore integration into mlir?
-<!-- - explain x87 -->

@@ -236,44 +236,47 @@ element-wise add example.
 
 \item Use small bit width for every element: reducing bit width by half doubles the
 amount of numbers packed into a single vector register, and essentially reduces
-the instruction count by half.  \hl{(Some figure TODO)}
+the instruction count by half (See Table \ref{archtable}). 
 
 \item Fast overflow checking: for integers, overflow has to be checked manually
 and this introduces 60\%  \hl{(TODO: verify this number?)} overhead, as
-benchmarks in the Section \ref{sec:todo} shown. This is because the x86
-architecture does not provide status registers to indicate integer overflown.
-However, there is one for floating points, making floating points overflow
-detection almost free. 
+benchmarks in the Section \ref{sec:i16-overflow-checking} shown. This is because
+the x86 architecture does not provide status registers to indicate integer
+overflown. However, there is one for floating points, making floating points
+overflow detection almost free. 
 
 \end{enumerate}
 
 
-opencompl’s fork of LLVM includes a modified version of \texttt{pivot} that
-utilizes \dtshort{} and is designed for matrices with 32 columns or less \cite{FPL2}.
-This approach offers the advantage of being able to pack a row of 32 elements
-into a single \texttt{AVX-512} register and addresses issues 1 and 2. However,
-overflow is still checked manually, causing 4x or 5x more instruction count (
-Section \ref{sec:todo}). Moreover, this approach introduces a new disadvantage,
-the support for vectorized \dtshort{} is very rare among CPU manufactured
-in the last decade (Section \ref{sec:todo}). 
+Previous work \cite{FPL2} have implemented a modified version of \texttt{pivot}
+that utilizes \dtshort{} and is designed for matrices with 32 columns or less
+\cite{FPL2}. This approach offers the advantage of being able to pack a row of
+32 elements into a single \texttt{AVX-512} register and addresses issues 1 and
+2. However, overflow is still checked manually, causing 4x or 5x more
+instruction count ( Section \ref{sec:i16-overflow-checking}). Moreover, this
+approach introduces a new disadvantage, \texttt{AVX-512} extensions are required
+for the support for vectorized \dtshort{}, this is very rare among CPU
+manufactured in the last decade (Section \ref{sec:avx512}). 
 
 An alternative approach is to do 23-bit or 52-bit integer operations using float
 (32-bit floating point) or double (64-bit floating point) respectively. Though
 floating points are notorious for precision issues, they are reliable when
 representing integers that fit inside their mantissa, 23 bits for float and 52
 bits for double \footnote{ IEEE 754 specification is introduced in Section
-\ref{sec:todo}}. When the result of some integer computation exceeds the bit
+\ref{sec:IEEE754}}. When the result of some integer computation exceeds the bit
 size of the mantissa, floating point imprecision almost always occurs and a
-status register will be set automatically (Section \ref{sec:todo}). Comparing to
-\dtshort{}, even though vector size is sacrificed as there does not exist
-support for 16-bit floating point \texttt{half}, using floating points could
-still potentially be faster, because overflow checking overhead can be
+status register will be set automatically (Section \ref{sec:overflow-float}).
+Comparing to \dtshort{}, even though vector size is sacrificed as there does not
+exist support for 16-bit floating point \texttt{half}, using floating points
+could still potentially be faster, because overflow checking overhead can be
 significantly reduced. With floating points, the cost of overflow checking is
 the time spent on resetting the status register once at the beginning of a
-sequence calls to `pivot`, plus reading it, per \texttt{pivot} call. Benchmarks
-\hl{TODO: some figure} indicate that the total overhead is as low as 1 ns, as it
-only adds 1 ns to read the status register in the instruction execution
-pipeline, and the average cost of resetting per pivot is negligible. 
+sequence of calls to \pivot{}, plus reading it in each \pivot{} call. Benchmarks
+\hl{TODO: some figure} indicate that even though reading the register and
+resetting may take 4.5 ns and 9.4 ns respectively, the effective total overhead
+is as low as 1 ns. The average cost of resetting per pivot can be treated as
+negligible, while the superscalar and out-of-order execution pipeline hides the
+latency of reading the status register with pending memory operations.
 
 This report will first analyze the capability of modern CPU micro-architecture,
 especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
@@ -403,6 +406,7 @@ sustained by the frontend \cite{Zen4Critique}.
 \section{Floating points}
 \label{sec:i23}
 \subsection{IEEE 754}
+\label{sec:IEEE754}
 IEEE 754 is the standard for representing and manipulating floating-point
 numbers in modern x86 computers. The standard defines several different formats
 for representing floating point numbers, the most common ones are 32-bit single
@@ -1237,6 +1241,7 @@ and therefore must be processed as scalar values.
 
 
 \subsubsection{Implementation of vectorized \dtshort{} overflow checking}
+\label{sec:i16-overflow-checking}
 By comparing the result of a conventional addition and saturated addition, it
 indicates whether an addition has gone overflown or not. In case of overflow,
 with saturated add, the result always retains at the maximum possible value of
@@ -1505,6 +1510,28 @@ potentially outperform int16.
 \section{Implementation and Optimization}
 
 \subsection{Matrix-wise transprecision}
+Transprecision techniques can be implemented at different levels of scale, such
+as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
+are implemented using the matrix-wise transprecision style. For \dtfloat{},
+the \mxcsr{} register accumulates information regarding previous occurrences of
+overflow and imprecision, until it is cleared manually. 
+
+The element-wise method is not suitable in this scenario, as it defeats the
+purpose of vectorization. The row-wise method is not chosen either, due to that
+overflow is not likely to occur and the matrix is small. Reading the \mxcsr{}
+can be considered as a expensive operation, comparing to the time spent on
+pivoting through the entire matrix. Avoiding wasted arithmetic instructions
+after overflow at the cost of more \mxcsr{} reads is not a cost-effective
+trade-off.
+
+Even though the \pivot{} function using \dtshort{} was implemented using the
+row-transprecision approach in previous works \cite{FPL2}, it is modified to
+match with the matrix-wise transprecision style, in order to control differences
+between the \dtfloat{} counterpart. After the overflow checking instructions,
+instead of a branch instruction pointing to the overflow handler, the boolean
+operator OR is applied between that overflow checking result register and a
+overflow flag. 
+
 
 \subsection{Double buffering}
 
@@ -1533,17 +1560,24 @@ cycles. In comparison, it can do two multiplication or addition of ZMM
 vectors every cycle. The discrepancy in throughput between computing and IO
 suggests that memory copy very expensive and inefficient. 
 
+\subsection{Alignment and padding }
 \subsection{Reduce number of matrix index computation}
+\label{sec:optmz-get-index}
+
+By placing the pivot row as the first row in the matrix, 
+
+In fact, the pivot function can be optimized to only
+compute index once (See Section 4.1.3) by placing the pivot row as first row. 
+
 \subsection{Loop unrolling}
 
-\subsection{Alignment}
+
 
 \subsection{Vector size specialization}
 
 
 
 
-\label{sec:optmz-get-index}
 
 
 \chapter{Conclusion and Future work}
