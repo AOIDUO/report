@@ -192,20 +192,20 @@ from the Informatics Research Ethics committee.
 
 MLIR, Multi-Level Intermediate Representation, is a infrastructure for building
 reusable and extensible compilers. Its aim is to reduce fragmentation in domain
-specific languages and heterogeneous hardwares \cite{mlir}. Its Presburger
+specific languages and heterogeneous hardwares~\cite{mlir}. Its Presburger
 library provides polyhedral compilation techniques to make dependence analysis
-and loop optimization \cite{mliraffine} and cache modeling \cite{CacheModel}.
+and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
 Presburger arithmetics involves determining whether conjunction of linear
-arithmetic constraints is satisfiable \cite{SMLPPA}, and can be solved using the
+arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
 simplex method of linear programming, with its core function "pivot" consumes
-\hl{TODO: find the number} \% \cite{FPL1} of the runtime. 
+\hl{TODO: find the number} \%~\cite{FPL1} of the runtime. 
 
 The \texttt{pivot} function involves two multiplication and one addition
 operation on every element in a matrix. Notably, the input matrices for this
 library tend to exhibit characteristics of small values and low dimensionality.
 For example, 90\% of test cases work with 16-bit integers that never overflow,
 and 74\% of isl’s runtime is spent on test cases that we can compute using
-16-bit integers and matrices with at most 32 columns \cite{FPL2}. These
+16-bit integers and matrices with at most 32 columns~\cite{FPL2}. These
 properties can be leveraged to take advantage from modern micro-architectural
 hardware resources, thereby accelerating the process.
 
@@ -252,7 +252,7 @@ overflow detection almost free.
 
 
 Previously there was an attempt to vectorize \texttt{pivot} that utilizes
-\dtshort{} and targets matrices with 32 columns or less \cite{FPL2}. This
+\dtshort{} and targets matrices with 32 columns or less~\cite{FPL2}. This
 approach offers the advantage of being able to pack a row of 32 elements into a
 single \texttt{AVX-512} register and addresses issues 1 and 2. However, overflow
 is still checked manually, causing 4x or 5x more instruction count (Section
@@ -342,7 +342,7 @@ together with \begin{math}b_1 \,...\, b_m\end{math} encodes the constraints of
 the problem in a matrix. 
 
 % in a matrix of \begin{math}m\end{math} rows and
-% \begin{math}n+1\end{math} columns \cite{FPL1}.
+% \begin{math}n+1\end{math} columns~\cite{FPL1}.
 
 https://people.richland.edu/james/ictcm/2006/simplex.html
 
@@ -369,7 +369,7 @@ problems encountered during analyzing linear programs in cache analytical
 modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
 in the value of each element. Specifically, more than 99\% of the coefficients
-require less than 10 bits and 95\% of them are less than 20 columns \cite{FPL1}.
+require less than 10 bits and 95\% of them are less than 20 columns~\cite{FPL1}.
 Thus, most of the rows fit inside a 512-bit vector register of 32
 \dtshort{} elements, and a row operation can be done in a single
 instruction. 
@@ -392,7 +392,7 @@ operation using \dtlong{} and \texttt{LargeInteger}. The
     support are rare (Section \ref{sec:avx512}). 
     \item Despite the \dtshort{} version is fast \hl{TODO: find how much
     faster in FPL paper}, overflow checking overhead is ??\%\hl{TODO: find how
-    much is overhead} \cite{FPL2}. Using floating points could significantly
+    much is overhead}~\cite{FPL2}. Using floating points could significantly
     reduce this overhead and potentially be faster (Section \ref{sec:i23}).  
 \end{compactlist}
 
@@ -424,7 +424,7 @@ floating point execution units, capable of doing addition, multiplication or
 both in a single instruction. See Section \ref{sec:FMA}.} 
 and Intel provides 2 512-bit \texttt{AVX-512} FMA units by
 fusing the existing \texttt{AVX-2}  units into a \texttt{AVX-512} unit, then introduces an
-additional FMA \texttt{AVX-512} unit \cite{SLK-X}. The additional \texttt{AVX-512} unit increases
+additional FMA \texttt{AVX-512} unit~\cite{SLK-X}. The additional \texttt{AVX-512} unit increases
 the heat flux density of the chip, causing server thermal throttling issues. 
 
 Intel attempted to mitigate this problem by introducing the ``AVX-offset'' mode.
@@ -433,7 +433,7 @@ automatically enters AVX-offset mode and reduces its clock frequency
 \cite{AVX-offset}. However, in practice it is more common to have a mix of
 control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions, causing
 many scenario could run faster if the additional \texttt{AVX-512} is disabled
-(and does not thermal throttle) \cite{Zen4Critique}.
+(and does not thermal throttle)~\cite{Zen4Critique}.
 
 AMD’s implementation of \texttt{AVX-512} in Zen4 has slightly less computing power, but
 much more efficient. Zen4 can be considered as modernized version of Zen3 or
@@ -442,11 +442,11 @@ Zen2, where Zen2 and Zen3 supports \texttt{AVX-2}  by providing 2 FADD units
 only. They may be considered as simplified FMA} and 2 FMA units of 256-bit width
 \cite{Zen2ChipWiki}. Zen4 "double-pumps" these existing circuits to create a
 single 512-bit FADD and a single 512-bit FMA, without introducing any new
-execution units for floating point arithmetic \cite{Zen4Critique}. Zen2 and Zen3
-are reputable for its high performance per watt \cite{ZenPerfPerWatt}, and it is
+execution units for floating point arithmetic~\cite{Zen4Critique}. Zen2 and Zen3
+are reputable for its high performance per watt~\cite{ZenPerfPerWatt}, and it is
 expected to be better on Zen4 with more advanced lithography. Benchmarks
 (\hl{TODO Some section}) indicate that this design indeed does not cause
-throttling in \texttt{AVX-512} workloads \cite{Zen4Critique}.
+throttling in \texttt{AVX-512} workloads~\cite{Zen4Critique}.
 
 Additionally, rebuilding existing software to target \texttt{AVX-512} may bring slight
 performance improvement. One benefit of \texttt{AVX-512} is that it reduces front-end
@@ -454,7 +454,7 @@ pressure. In the case of Zen4 micro-architecture, though the back-end is
 possible to commit 2 \texttt{AVX-2}  FADD and 2 \texttt{AVX-2}  FMA every cycle, the front-end
 has to dispatch 4 instructions per cycle, which is quite difficult. The
 equivalency in \texttt{AVX-512} only takes 2 instructions, this is much more likely to be
-sustained by the frontend \cite{Zen4Critique}.
+sustained by the frontend~\cite{Zen4Critique}.
 
 
 \section{Floating points}
@@ -496,7 +496,7 @@ Substituting the sign, exponent and mantissa into the formula, we get: \\
         \includegraphics[width=\linewidth]{image/ieee-f32.png}
         \includegraphics[width=\linewidth]{image/ieee-f64.png}
         \caption{Diagrams of IEEE 754 single (32 bits) and double (64 bits)
-        precision floating point \cite{ieee754-diagram}. In some literature
+        precision floating point~\cite{ieee754-diagram}. In some literature
         ``mantissa'' is referred as ``fraction''.}
         \label{fig:ieee-f32}
     \end{center}
@@ -515,7 +515,7 @@ created:
 \begin{math}A\end{math},
 \begin{math}B\end{math} and
 \begin{math}C\end{math} are the operands, 
- \begin{math}Y\end{math} is the result \cite{CARD}.
+ \begin{math}Y\end{math} is the result~\cite{CARD}.
 
 FMA saves cycles and reduces accumulation of rounding errors, while at the same
 time not adding significant complexity to the circuit. A FMA execution unit is
@@ -570,7 +570,7 @@ not break the mechanism of representing integer in floating-points.
 
 Throughout history, floating point processing units in GPUs have been utilized
 for fast integer arithmetic, for example, modular exponentiation
-\cite{intfpu-modexp} and RSA algorithms \cite{intfpu-rsa}, because often the
+\cite{intfpu-modexp} and RSA algorithms~\cite{intfpu-rsa}, because often the
 architecture of GPU prioritizes floating points performance rather than
 integers. 
 \hl{TODO: place this paragraph here?}
@@ -663,7 +663,7 @@ consistent results:
 
 \mca{}, LLVM Machine Code Analyzer, is a tool to analyze performance of executing
 some instructions on a specific CPU micro-architecture, according to scheduling
-information provided by LLVM \cite{llvm-mca}. 
+information provided by LLVM~\cite{llvm-mca}. 
 
 By supplying \mca{} with a piece of assembly code and the target
 micro-architecture codename, \mca{} reports various metrics to indicate how fast
@@ -1276,7 +1276,7 @@ costs double the amount of time than \dtshort{} and \dtfloat{} respectively.
 \begin{figure}[H]\captionsetup{name=Table}
     \includegraphics[width=\linewidth]{image/arch-table.png}
     \caption{A summary for features provided by the Zen4 micro-architecture
-    for different data types \cite{Zen4Critique} \cite{Zen2ChipWiki}.}
+    for different data types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
     \label{archtable}
 \end{figure}
 
@@ -1352,7 +1352,7 @@ and
 By enabling
 \hlc[cyan!60]{\texttt{kord}}\footnote{Bitwise logical OR masks}. 
 overflow checking, it brings  4x or 5x more instruction count and 60\% more
-runtime \cite{FPL2}. \hl{(TODO: verify this number?)}
+runtime~\cite{FPL2}. \hl{(TODO: verify this number?)}
 
 \begin{center}
 \begin{table}[ht]
@@ -1417,7 +1417,7 @@ To detect floating point overflow or imprecision, one approach is to enable
 floating point imprecision as a trap, then upon overflow, the interrupt \sigfpe{}
 is raised and the PC (program counter) will be redirected to its handler. The
 method can be programmed by using useful functions from the \texttt{fenv}
-library as follow \cite{fenvlib}:
+library as follow~\cite{fenvlib}:
 \begin{verbatim}
 void signal_handler(int signal) {
     // handle fpe
@@ -1598,7 +1598,7 @@ after overflow at the cost of more \mxcsr{} reads is not a cost-effective
 trade-off.
 
 Even though the \pivot{} function using \dtshort{} was implemented using the
-row-transprecision approach in previous works \cite{FPL2}, it is modified to
+row-transprecision approach in previous works~\cite{FPL2}, it is modified to
 match with the matrix-wise transprecision style, in order to control differences
 between the \dtfloat{} counterpart. After the overflow checking instructions,
 instead of a branch instruction pointing to the overflow handler, the boolean
@@ -1637,9 +1637,9 @@ suggests that memory copy very expensive and inefficient.
 In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
 assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. 
 \texttt{vmovups} for
-``Move Unaligned Packed Single-Precision Floating-Point Values'' \cite{vmovups},
+``Move Unaligned Packed Single-Precision Floating-Point Values''~\cite{vmovups},
 and \texttt{vmovdqu64} for 
-``Move Unaligned Packed Integer Values'' \cite{vmovdqu64}. 
+``Move Unaligned Packed Integer Values''~\cite{vmovdqu64}. 
 
 Unaligned load may bring potential performance impacts. When accessing memory,
 the CPU retrieves data from the main memory or cache in units of cache lines. On
@@ -1647,10 +1647,10 @@ Zen4 the size of cache line is 512-bits, exactly the size of a \zmm{} register
 \cite{AMDManual}. Alignment guarantees that a single cache line can cover a
 vector register. Otherwise, a \zmm{} register might be spitted on two cache lines.
 Both cache lines of 1028 bits have to be requested from the memory, then
-performs a shift to extract the desired 512 bits \cite{Unaligned}.  
+performs a shift to extract the desired 512 bits~\cite{Unaligned}.  
 
 To address this issue, an aligned allocator is given to the constructor of
-\texttt{std::vector} when initializing a matrix \cite{FPL2}. 
+\texttt{std::vector} when initializing a matrix~\cite{FPL2}. 
  The compiler is capable of recognizing alignment
 and issue aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps}
 accordingly. 
@@ -1694,7 +1694,7 @@ to the \pivot{} function implemented using \dtfloat{} in this report.
     \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/ieee-f16.png}
     \end{center}
-    \caption{IEEE 754 half precision floating point (16 bits). \cite{ieee754-diagram}}
+    \caption{IEEE 754 half precision floating point (16 bits).~\cite{ieee754-diagram}}
     \label{fig:ieee-f16}
 \end{figure}
 
