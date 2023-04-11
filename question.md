@@ -1,6 +1,6 @@
 ## Questions 
+- i am speciftying Zen4 for no reason!
 
-- talk about int16 in abstract and introduction?
 
 ## Notes
 - Note: my current fastest impl with float is ~25 ns using ymm, for col 24
