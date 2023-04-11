@@ -1,5 +1,5 @@
 ## Questions 
-- i am speciftying Zen4 for no reason!
+- i am specifying Zen4 for no reason!
 
 
 ## Notes
@@ -15,8 +15,7 @@ a math library ... -->
 
 
 ## TODO: 
-<!-- - finish llvm-mca -->
-<!-- - explain x87 -->
+- fix avx-512
 - finish pivot section
 - in background,  write a chapter about simplex algorithm and what does pivot do
 - fix abstract

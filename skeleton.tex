@@ -394,7 +394,7 @@ operation using \dtlong{} and \texttt{LargeInteger}. The
 \dtshort{} version is not merged with the upstream for two reasons: 
 \begin{compactlist} 
     \item \dtshort{} vectors require \texttt{AVX-512} ISA extension, but hardware
-    support are rare (Section \ref{sec:avx512}). 
+    support is rare (Section \ref{sec:avx512}). 
     \item Despite the \dtshort{} version is fast \hl{TODO: find how much
     faster in FPL paper}, overflow checking overhead is ??\%\hl{TODO: find how
     much is overhead}~\cite{FPL2}. Using floating points could significantly
@@ -416,50 +416,58 @@ instruction set architecture (ISA) extension. \texttt{AVX-512} succeeds \texttt{
 width is increased from \texttt{AVX-2}’s 256 bits to 512 bits. \texttt{AVX-512} also provides new
 instructions, for example, \dtshort{} saturated addition.
 
-% \subsection{History}
+\subsection{Intel}
 
 Even though its specification was released by Intel in 2013, it had been
-unpopular, as it did not bring practical performance improvements. The primary
-reason was that it consumed a lot more power than usual, causing severe
-overheating. The micro-architecture Skylake from Intel, and its \texttt{AVX-512} enabled
-counterpart Skylake-X is a classic example. Skylake provides 2 256 bits FMA
-\texttt{AVX-2} execution units 
-\footnote{Fused-multiply-add (FMA) execution units are a type of
-floating point execution units, capable of doing addition, multiplication or
-both in a single instruction. See Section \ref{sec:FMA}.} 
-and Intel provides 2 512-bit \texttt{AVX-512} FMA units by
-fusing the existing \texttt{AVX-2}  units into a \texttt{AVX-512} unit, then introduces an
-additional FMA \texttt{AVX-512} unit~\cite{SLK-X}. The additional \texttt{AVX-512} unit increases
-the heat flux density of the chip, causing server thermal throttling issues. 
+unpopular ~\cite{linusHopeAvx512Die}, as it did not bring practical performance
+improvements. The primary reason was that it consumed a lot more power than
+usual, causing severe overheating. The micro-architecture Skylake from Intel,
+and its \texttt{AVX-512} enabled counterpart Skylake-X is a classic example.
+Skylake provides 2 256 bits FMA \texttt{AVX-2} execution units
+\footnote{Fused-multiply-add (FMA) execution units are a type of floating point
+execution units, capable of doing addition, multiplication or both in a single
+instruction. See Section \ref{sec:FMA}.} and Intel provides 2 512-bit
+\texttt{AVX-512} FMA units by fusing the existing \texttt{AVX-2}  units into a
+\texttt{AVX-512} unit, then introduces an additional FMA \texttt{AVX-512}
+unit~\cite{SLK-X}. The additional \texttt{AVX-512} unit increases the heat flux
+density of the chip, causing server thermal throttling issues. 
 
-Intel attempted to mitigate this problem by introducing the ``AVX-offset'' mode.
-When a workload involving \texttt{AVX-512} instructions is encountered, the CPU
-automatically enters AVX-offset mode and reduces its clock frequency
-\cite{AVX-offset}. However, in practice it is more common to have a mix of
-control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions, causing
-many scenario could run faster if the additional \texttt{AVX-512} is disabled
-(and does not thermal throttle)~\cite{Zen4Critique}.
+Intel attempted to mitigate this problem by introducing the
+``\texttt{AVX-offset}'' mode. When a workload involving \texttt{AVX-512}
+instructions is encountered, the CPU automatically enters the
+\texttt{AVX-offset} mode and reduces its clock frequency \cite{AVX-offset}. This
+solution only works in theoretical benchmarks where \texttt{AVX-512}
+instructions presents in large bulk, but in practice it is more common to have a
+mix of control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions. The
+clock frequency of executing those non-\texttt{AVX-512} instructions is
+decreased together with \texttt{AVX-512} instructions, causing many workloads
+could run faster with disabled \texttt{AVX-512} and higher clock
+frequency~\cite{Zen4Critique}. 
 
-AMD’s implementation of \texttt{AVX-512} in Zen4 has slightly less computing power, but
-much more efficient. Zen4 can be considered as modernized version of Zen3 or
-Zen2, where Zen2 and Zen3 supports \texttt{AVX-2}  by providing 2 FADD units
-\footnote{Floating-point add units (FADD) can execute addition instructions
-only. They may be considered as simplified FMA} and 2 FMA units of 256-bit width
-\cite{Zen2ChipWiki}. Zen4 "double-pumps" these existing circuits to create a
-single 512-bit FADD and a single 512-bit FMA, without introducing any new
-execution units for floating point arithmetic~\cite{Zen4Critique}. Zen2 and Zen3
-are reputable for its high performance per watt~\cite{ZenPerfPerWatt}, and it is
-expected to be better on Zen4 with more advanced lithography. Benchmarks
-(\hl{TODO Some section}) indicate that this design indeed does not cause
-throttling in \texttt{AVX-512} workloads~\cite{Zen4Critique}.
+\hlc[pink]{OptionalTODO: alderlake disabled avx-512 for big.LITTLE}
 
-Additionally, rebuilding existing software to target \texttt{AVX-512} may bring slight
-performance improvement. One benefit of \texttt{AVX-512} is that it reduces front-end
-pressure. In the case of Zen4 micro-architecture, though the back-end is
-possible to commit 2 \texttt{AVX-2}  FADD and 2 \texttt{AVX-2}  FMA every cycle, the front-end
-has to dispatch 4 instructions per cycle, which is quite difficult. The
-equivalency in \texttt{AVX-512} only takes 2 instructions, this is much more likely to be
-sustained by the frontend~\cite{Zen4Critique}.
+
+\subsection{AMD}
+AMD recently decides to add support for \texttt{AVX-512} in their latest
+micro-architecture Zen4. It has slightly less computing power comparing with
+Intel, but much more efficient. Zen4 can be considered as modernized version of
+Zen3 or Zen2, where Zen2 and Zen3 supports \texttt{AVX-2}  by providing 2 FADD
+units \footnote{Floating-point add units (FADD) can execute addition
+instructions only. They may be considered as simplified FMA} and 2 FMA units of
+256-bit width \cite{Zen2ChipWiki}. Zen4 ``double-pumps'' these existing circuits
+to create a single 512-bit FADD and a single 512-bit FMA, without introducing
+any new arithmetic units ~\cite{Zen4Critique}. Zen2 and Zen3 are reputable for
+its high performance per watt~\cite{ZenPerfPerWatt}, and Zen4 would be better
+with its more advanced lithography~\cite{Zen4Critique}.
+
+Additionally, rebuilding existing software to target \texttt{AVX-512} may bring
+slight performance improvement. One benefit of \texttt{AVX-512} is that it
+reduces front-end pressure. In the case of the Zen4 micro-architecture, though
+the back-end is possible to commit 2 \texttt{AVX-2} FADD and 2 \texttt{AVX-2}
+FMA every cycle, the front-end has to dispatch 4 instructions per cycle, which
+is quite difficult. The equivalency in \texttt{AVX-512} only takes 2
+instructions, this is much more likely to be sustained by the
+frontend~\cite{Zen4Critique}.
 
 
 \section{Floating points}
