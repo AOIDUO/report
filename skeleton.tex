@@ -365,14 +365,9 @@ modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
 in the value of each element. Specifically, more than 99\% of the coefficients
 require less than 10 bits and 95\% of them are less than 20 columns \cite{FPL1}.
-<<<<<<< HEAD
-Thus, most of the rows fit inside a 512-bit vector register of 32 \dtshort
-elements, and a row operation can be done in a single instruction. 
-=======
 Thus, most of the rows fit inside a 512-bit vector register of 32
 \dtshort{} elements, and a row operation can be done in a single
 instruction. 
->>>>>>> 51e184ae2a8dce16c8203a2fef25c17ee59bbbf1
 
 However, in rare and corner cases, there can be larger coefficients up to 127
 bits. Practically, the upper bound of coefficient size is unknown, making it
@@ -804,18 +799,6 @@ subsequently resolved after rerunning \exegesis{} and confirming that
 
 \hl{TODO: should I
 write a paragraph to emphacise that \mca{} is unreliable?}
-
-<<<<<<< HEAD
-\texttt{llvm-mca}, LLVM Machine Code Analyzer, is a tool to analyze performance
-of executing some instructions on a specific CPU micro-architecture, according
-to scheduling information provided by LLVM \cite{llvm-mca}. This tool help with
-predicting and explaining performance characteristics \hl{TODO: Is it necessary
-to mention mca? Only use case is I found it not helpful}
-
-=======
->>>>>>> 51e184ae2a8dce16c8203a2fef25c17ee59bbbf1
-
-and reason about why clang gives a certain selection of instructions. 
 
 \chapter{Experiments with Toy Example}
 \label{sec:Toy}
@@ -1544,20 +1527,11 @@ expense, but for \dtshort{} it is always a portion of the total runtime.
     \label{fig:i16-f32}
 \end{figure}
 
-<<<<<<< HEAD
 Note that even though \dtshort is faster than \dtfloat in this benchmark, it is
 not sound to conclude that the \texttt{pivot} function implemented in \dtshort
 will be faster than \dtfloat. The toy example is different from the \pivot
 function in many aspects, for example, number of memory load operations. In case
 of the actual pivot function, float may potentially outperform int16. 
-=======
-It is worth noting that even though \dtshort{} is faster than \dtfloat{} in this
-benchmark, it is not sound to conclude that the \texttt{pivot} function
-implemented in \dtshort{} will be faster than \dtfloat{}. The toy example is
-different from the \pivot{} function in many aspects, for example, number of
-memory load operations. In case of the actual pivot function, float may
-potentially outperform int16. 
->>>>>>> 51e184ae2a8dce16c8203a2fef25c17ee59bbbf1
 
 % \begin{verbatim}
 % bool function(matrix & tableau) {
@@ -1581,9 +1555,6 @@ potentially outperform int16.
 
 \section{Implementation and Optimization}
 
-<<<<<<< HEAD
-% \subsection{Matrix-wise transprecision}
-=======
 \subsection{Matrix-wise transprecision}
 Transprecision techniques can be implemented at different levels of scale, such
 as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
@@ -1607,7 +1578,6 @@ instead of a branch instruction pointing to the overflow handler, the boolean
 operator OR is applied between that overflow checking result register and a
 overflow flag. 
 
->>>>>>> 51e184ae2a8dce16c8203a2fef25c17ee59bbbf1
 
 \subsection{Matrix-wise transprecision and Double buffering}
 
