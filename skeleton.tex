@@ -568,13 +568,13 @@ for fast integer arithmetic, for example, modular exponentiation
 \cite{intfpu-modexp} and RSA algorithms \cite{intfpu-rsa}, because often the
 architecture of GPU prioritizes floating points performance rather than
 integers. 
-\hl{TODO: this paragraph here? or introduction?}
+\hl{TODO: place this paragraph here?}
 
 
 \begin{figure}
 \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/0.3004.jpg}
-    \caption{A floating point meme: 0.1 + 0.2 = 0.30000000000000004}
+    \caption{A floating point meme: \texttt{0.1 + 0.2 = 0.30000000000000004}}
     \label{meme}
 \end{center}
 \end{figure}
@@ -857,6 +857,7 @@ enabled. Starting with an example (Listing \ref{vec-add-float-auto}), the simple
 the third. 
 
 \begin{table}[ht]\captionsetup{name=Listing}
+\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
     Source code\\
     \midrule
@@ -870,8 +871,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
     \end{VerbatimCompact}
     \\
 
-    Assembly snippet of the hot loop, compiled with \texttt{-O3 -march=native}
-    (vectorization on)\\
+    Assembly snippet of the hot loop, vectorization on\\
     \midrule
     \begin{VerbatimCompact}
 1458: c4 c1 7c 58 84 87 20   vaddps -0x1e0(%r15,%rax,4),%zmm0,%zmm0
@@ -880,9 +880,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 1469: fe ff ff
     \end{VerbatimCompact}
     \\
-
-    Assembly snippet of the hot loop, compiled with \texttt{-O3 -march=native
-    -mno-avx -mno-sse} (vectorization off)\\
+    Assembly snippet of the hot loop, vectorization off\\
     \midrule
     \begin{VerbatimCompact}
 120d: d8 44 82 04    fadds  0x4(%rdx,%rax,4)
@@ -890,7 +888,9 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 1215: d9 44 86 08    flds   0x8(%rsi,%rax,4)
     \end{VerbatimCompact}
 \end{tabular}
-\caption{}
+\caption{The vectorized and scalar binary are derived by compiling with flags
+\texttt{-O3 -march=native} and \texttt{-O3 -march=native -mno-avx -mno-sse}
+respectively, on a Zen4 computer with \texttt{clang-17}.}
 \label{vec-add-float-auto}
 \end{table}
 \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
@@ -931,6 +931,7 @@ between the vectors to performed element-wise operations. The previous
 \ref{vec-add-float-vecty}:
 
 \begin{table}[ht]\captionsetup{name=Listing}
+\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
     Source code\\
     \midrule
@@ -939,16 +940,16 @@ between the vectors to performed element-wise operations. The previous
 #define FloatZmmSize 16
 typedef float floatZmm __attribute__((ext_vector_type(FloatZmmSize)));
 void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
-    for (uint32_t i = 0; i < size; i += FloatZmmSize ){
+    for (uint32_t i = 0; i < size; i += FloatZmmSize){
         floatZmm src1Vec = *(floatZmm *)(src1_ptr + i);
-        floatZmm src2Vec = *(floatZmm*)(src2_ptr + i);
-        floatZmm resultVec = src1Vec + src2Vec;
-        *(floatZmm *)(dst_ptr + i) = resultVec;
+        floatZmm src2Vec = *(floatZmm *)(src2_ptr + i);
+        *(floatZmm *)(dst_ptr + i) = src1Vec + src2Vec;
     }
 }
 \end{VerbatimCompact}
 \end{tabular}
-\caption{}
+\caption{Comparing to Listing \ref{vec-add-float-auto}, it is slightly more
+complicated to code with vector types.}
 \label{vec-add-float-vecty}
 \end{table}
 \subsection{Evaluation}
@@ -960,14 +961,14 @@ its mechanisms. One of the issues is that clang may select a suboptimal vector
 width.
 
 Consider the \texttt{vec\_fma} function in Listing
-\ref{table:vec-fma-float-auto} and \ref{table:vec-fma-float-vecty}, a slightly
+\ref{table:vec-fma-float}, a slightly
 more complicated version of the previous \texttt{vec\_add} example, where an
 additional array is introduced and the element-wise operation is changed from
 addition to FMA. The disassembly reveals that clang decides to use FMA vector
 instructions of 128-bit width, but when vector size is constrained to 512-bit
 width by defining a vector type, more optimal binary can be generated. Benchmark
 indicates that the 512-bit vector width version is xx\% faster.  
-\hl{TODO: determine this number}
+\hl{TODO: make plot and determine this number}
 
 
 % 80e4: c5 fa 10 04 b2       	vmovss (%rdx,%rsi,4),%xmm0
@@ -983,9 +984,10 @@ indicates that the 512-bit vector width version is xx\% faster.
 % 8112: 43 8d 84 2e 8b 00 00 	lea    0x8b(%r14,%r13,1),%eax
 % 8119: 00 
 
-\begin{table}[ht]\captionsetup{name=Listing}
+\begin{table}[H]\captionsetup{name=Listing}
+\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code\\
+    Source code for clang automatic vectorization\\
     \midrule
     \begin{VerbatimCompact}
 void vec_fma(float* src1_ptr, float* src2_ptr,
@@ -1006,14 +1008,15 @@ void vec_fma(float* src1_ptr, float* src2_ptr,
 810c: c4 c1 7a 11 0c 81  vmovss %xmm1,(%r9,%rax,4)
     \end{VerbatimCompact}
     \\
-\end{tabular}
-\caption{}
-\label{table:vec-fma-float-auto}
-\end{table}
+\\
+% \end{tabular}
+% \caption{}
+% \label{table:vec-fma-float-auto}
+% \end{table}
 
-\begin{table}[H]\captionsetup{name=Listing}
-\begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code\\
+% \begin{table}[H]\captionsetup{name=Listing}
+% \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
+    Source code written with clang's vector type\\
     \midrule
     \begin{VerbatimCompact}
 #define size 128
@@ -1041,11 +1044,11 @@ void vec_fma(float* src1_ptr, float* src2_ptr,
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{}
-\label{table:vec-fma-float-vecty}
+\caption{The key distinction between two vectorization approaches is the
+register types. \texttt{xmm*}s and \texttt{zmm*}s are 128-bit and 512-bit
+registers respectively.}
+\label{table:vec-fma-float}
 \end{table}
-    
-
 
 
 In some cases clang could be even worse, it may fail to recognize vectorization
@@ -1053,13 +1056,14 @@ patterns from element-wise loop operations, leading to more reduction in
 performance. In the \texttt{vec\_fma} example, by changing the type signature
 from \dtfloat{} to \texttt{int}, clang decides to dispatch scalar
 instructions for addition (\texttt{add}) and multiplication (\texttt{imul})
-completely (Listing \ref{vec-fma-int-auto}). Their vectorized equivalency
+completely (Listing \ref{vec-fma-int}). Their vectorized equivalency
 \texttt{vpaddd} and \texttt{vpmulld} are more performant options. (Listing
-\ref{vec-fma-int-vecty}).
+\ref{vec-fma-int}).
 
-\begin{table}[ht]\captionsetup{name=Listing}
+\begin{table}[H]\captionsetup{name=Listing}
+\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code\\
+    Source code for clang automatic vectorization\\
     \midrule
     \begin{VerbatimCompact}
 #define size 128
@@ -1083,14 +1087,15 @@ void vec_fma(int* src1_ptr, int* src2_ptr,
 88c3: 45 01 fc     add    %r15d,%r12d
     \end{VerbatimCompact}
     \\
-\end{tabular}
-\caption{}
-\label{vec-fma-int-auto}
-\end{table}
+% \end{tabular}
+% \caption{}
+% \label{vec-fma-int-auto}
+% \end{table}
 
-\begin{table}[H]\captionsetup{name=Listing}
-\begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code\\
+% \begin{table}[H]\captionsetup{name=Listing}
+% \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
+\\
+    Source code written with clang’s vector type\\
     \midrule
     \begin{VerbatimCompact}
 #define size 128
@@ -1118,8 +1123,9 @@ void vec_fma(int* src1_ptr, int* src2_ptr,
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{}
-\label{vec-fma-int-vecty}
+\caption{Clang (version 17) fails to vectorize the loop that iterates through
+every element, but writing vector type guarantees vectorization. }
+\label{vec-fma-int}
 \end{table}
 
 
@@ -1158,7 +1164,7 @@ arithmetic. The differences between the two patterns are illustrated by a
 example provided in Table \ref{table:nested-flat}. 
 
 \begin{table}[ht]
-
+\captionsetup{justification=centering}
 \begin{tabular}{%
     >{\raggedright\arraybackslash}p{2cm}%
     >{\raggedright\arraybackslash}p{6.5cm}%
@@ -1621,7 +1627,16 @@ cycles. In comparison, it can do two multiplication or addition of ZMM
 vectors every cycle. The discrepancy in throughput between computing and IO
 suggests that memory copy very expensive and inefficient. 
 
-\subsection{Alignment and padding }
+\subsection{Alignment}
+In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
+assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. 
+\texttt{vmovups} for
+``Move Unaligned Packed Single-Precision Floating-Point Values'' \cite{vmovups},
+and \texttt{vmovdqu64} for 
+``Move Unaligned Packed Integer Values'' \cite{vmovdqu64}. 
+
+Unaligned brings potential 
+
 \subsection{Reduce number of matrix index computation}
 \label{sec:optmz-get-index}
 
