@@ -197,7 +197,7 @@ library provides polyhedral compilation techniques to make dependence analysis
 and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
 Presburger arithmetics involves determining whether conjunction of linear
 arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
-simplex method of linear programming, with its core function "pivot" consumes
+simplex method of linear programming, with its core function \pivot{} consumes
 \hl{TODO: find the number} \%~\cite{FPL1} of the runtime. 
 
 The \texttt{pivot} function involves two multiplication and one addition
@@ -274,12 +274,17 @@ exist support for 16-bit floating point \texttt{half}, using floating points
 could still potentially be faster, because overflow checking overhead can be
 significantly reduced. With floating points, the cost of overflow checking is
 the time spent on resetting the status register once at the beginning of a
-sequence of calls to \pivot{}, plus reading it in each \pivot{} call. Benchmarks
-\hl{TODO: some figure} indicate that even though reading the register and
-resetting may take 4.5 ns and 9.4 ns respectively, the effective total overhead
-is as low as 1 ns. The average cost of resetting per pivot can be treated as
-negligible, while the superscalar and out-of-order execution pipeline hides the
-latency of reading the status register with pending memory operations.
+sequence of calls to \pivot{}, plus reading it in each \pivot{} call. Even
+though reading the register and resetting may take 4.5 ns and 9.4 ns
+respectively (\hl{TODO: some figure}), the effective total overhead is as low as
+1 ns. The average cost of resetting per \pivot{} can be treated as negligible,
+while the superscalar and out-of-order execution pipeline hides the latency of
+reading the status register with pending memory operations. Moreover, floating
+points offer better compatibility with old computers than \dtshort{}. Vector
+\dtfloat{} or \dtdouble{} code can be executed on CPUs with \texttt{AVX-2}, the
+predecessor of \texttt{AVX-512}. Almost every x86 CPU from the last decade
+supports this extension. It can also be adapted to fit even older
+\texttt{AVX-128} and \texttt{SSE} CPUs with minimal change in source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
 especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
@@ -528,7 +533,7 @@ capable to do FMUL, FADD, and FSUB as well:
 
 This is a useful feature in many numerical computations that involve
 simultaneous multiplication and addition operations, such as dot product and
-matrix multiplication. Since the pivot function performs multiplication and
+matrix multiplication. Since the \pivot{} function performs multiplication and
 addition between the pivot row, some constant value and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
 
@@ -823,10 +828,10 @@ write a paragraph to emphacise that \mca{} is unreliable?}
 \chapter{Experiments with Toy Example}
 \label{sec:Toy}
 
-The pivot function does multiply and add for each row in the matrix, therefore
-the performance of FMA a simple vector toy can be an effective indicator. This
-chapter reports performance analysis on simple toy examples that do vector add
-or vector FMA with various setups, including: 
+The \pivot{} function does multiply and add for each row in the matrix,
+therefore the performance of FMA a simple vector toy can be an effective
+indicator. This chapter reports performance analysis on simple toy examples that
+do vector add or vector FMA with various setups, including: 
 
 \begin{enumerate} 
     \item Vectorization method 
@@ -1232,10 +1237,10 @@ between the two matrix data structures: nested list and flat list. }
 \end{table}
 
 Empirically indexing costs more time than integer multiplication and addition,
-thereby improving performance. Both the toy example and the pivot function
+thereby improving performance. Both the toy example and the \pivot{} function
 perform sequential load-compute-store operations on each row and each column,
 allowing the index of the next element to be computed by simply adding the step
-size or column size, further reducing memory overhead. In fact, the pivot
+size or column size, further reducing memory overhead. In fact, the \pivot{}
 function can be optimized to only compute index once (See Section
 \ref{sec:optmz-get-index}) by placing the pivot row as first row. Benchmark
 (Figure \ref{fig:nested-flat}) on the toy example confirms that when there are
@@ -1555,10 +1560,10 @@ expense, but for \dtshort{} it is always a portion of the total runtime.
 \end{figure}
 
 Note that even though \dtshort is faster than \dtfloat in this benchmark, it is
-not sound to conclude that the \texttt{pivot} function implemented in \dtshort
+not sound to conclude that the \pivot{} function implemented in \dtshort
 will be faster than \dtfloat. The toy example is different from the \pivot
 function in many aspects, for example, number of memory load operations. In case
-of the actual pivot function, float may potentially outperform int16. 
+of the actual \pivot{} function, float may potentially outperform int16. 
 
 % \begin{verbatim}
 % bool function(matrix & tableau) {
