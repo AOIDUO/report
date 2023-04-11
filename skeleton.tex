@@ -367,6 +367,7 @@ pivot operations and determining the entering and leaving variables.
 
 
 \section{Presburger library}
+\label{sec:presburger}
 % \subsection{Overview}
 
 The Fast Presburger Library (FPL) paper collected 465,460 representative linear
@@ -1687,12 +1688,45 @@ be indexed by incrementing the address.
 
 \subsection{Vector size specialization}
 
-A \texttt{YMM} register can pack 8 \dtfloat{}, and a \texttt{ZMM} register can
-pack 16 floats.
+A \ymm{} register can pack 8 \dtfloat{}s, and a \zmm{} register can pack 16
+\dtfloat{}s (Figure \ref{archtable}). Since most of the input matrices have less
+than 20 columns (\ref{sec:presburger}), representing a row with 2 \zmm{} vectors
+introduces padding waste of at least 12 \dtfloat{}s, but using 3 \ymm{}
+registers for a row reduces the minimal padding size to 4 \dtfloat{}s. 
 
+To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
+is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
+represent a row. The 8 combinations are listed in Table
+\ref{table:specialization} and their benchmarks are plotted in Figure
+\ref{fig:specialization}.
 
+\begin{table}[H]
+\centering
+\captionsetup{justification=centering}
+% \begin{tabular}{lll}
+    %    & \ymm{} register count & \zmm{} register count \\
+    % Column $\leq$ 8  & 1   & 1   \\
+    % Column $\leq$ 16 & 2   & 1   \\
+    % Column $\leq$ 24 & 3   & 2   \\
+    % Column $\leq$ 32 & 4   & 2  
+    % \end{tabular}
+\begin{tabular}{llll}
+    Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
+    Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
+    Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  
+    \end{tabular}
+\caption{todo}
+\label{table:specialization}
+\end{table}
 
-
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=50mm]{image/turtle.png}
+    \end{center}
+    \caption{\hl{TODO: write caption}}
+    \label{fig:specialization}
+\end{figure}
 
 \chapter{Conclusion and Future work}
 
