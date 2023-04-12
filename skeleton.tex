@@ -110,7 +110,7 @@ and mostly small value items. MLIR's upstream uses element-wise
 transprecision, from \dtlong{} to \texttt{LargeInteger}. 
 This can be improved if hardware resources are utilized effectively, by taking
 advantage of SIMD, and reducing the bit width for every element. 
-The current approach cannot be automatically vectorized by compiler,
+The current approach cannot be automatically vectorized by compilers,
 and \dtlong{} has a much larger bit width than what is
 typically used for most of the items in the matrix.
 Additionally, extra arithmetics are required to perform overflow checking 
@@ -120,12 +120,12 @@ This report ``innovates'' the
 % \footnote{This is not really a innovation. It it a common
 % technique on GPUs because often they are more capable on floating points than
 % integers. See Section \ref{sec:introduction} for more history and detail. }
-datatype, a 23-bit integer datatype created from the 23-bit mantissa of a
+data type, a 23-bit integer data type created from the 23-bit mantissa of a
 32-bit floating point, to address these issues. 
 \texttt{int23\_t} overflow can be captured as floating point imprecision by a
 status register, making overflow awareness almost free.  
-On a selected 30-row by 20-column representative input matrix, the runtime of
-is reduced from 550 ns to 26 ns, achieving 20 times speedup.
+On a selected 30-row by 19-column representative input matrix, the runtime is
+reduced from 550 ns to 26 ns, achieving 20 times speedup.
 
 % \hl{TODO:Question: mention int16 here?}
 
@@ -185,12 +185,12 @@ from the Informatics Research Ethics committee.
 \chapter{Introduction}
 \label{sec:introduction}
 
-MLIR, Multi-Level Intermediate Representation, is a infrastructure for building
-reusable and extensible compilers. Its aim is to reduce fragmentation in domain
-specific languages and heterogeneous hardwares~\cite{mlir}. Its Presburger
+MLIR, Multi-Level Intermediate Representation, is an infrastructure for building
+reusable and extensible compilers. It aims to reduce fragmentation in domain
+specific languages and heterogeneous hardware~\cite{mlir}. Its Presburger
 library provides polyhedral compilation techniques to make dependence analysis
 and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
-Presburger arithmetics involves determining whether conjunction of linear
+Presburger arithmetics involves determining whether the conjunction of linear
 arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
 simplex method of linear programming, with its core function \pivot{} is the
 main performance bottleneck~\cite{FPL1}. 
@@ -213,12 +213,12 @@ and inefficient, for the following reasons:
 \begin{enumerate}
 
 \item \dtlong{} has a much larger bit width than what is typically
-used for most of the elements in the matrix,
+used for most of the elements in the matrix.
 
-\item the compiler is not capable of automatically generating vectorized
-instructions to further optimize the process,
+\item The compiler is not capable of automatically generating vectorized
+instructions to further optimize the process.
 
-\item overflow is checked manually through additional arithmetic
+\item Overflow is checked through additional arithmetic
 operations.
 
 \end{enumerate}
@@ -232,14 +232,14 @@ following conditions:
 \ref{sec:vectorization-method-eval}) indicates at least 10 times
 performance improvement. 
 
-\item Use small bit width for every element: reducing bit width by half doubles the
-amount of numbers packed into a single vector register, and essentially reduces
-the instruction count by half (See Table \ref{archtable}). 
+\item Use small bit width for every element: reducing the bit width by half
+doubles the amount of numbers packed into a single vector register, and
+essentially reduces the instruction count by half (See Table \ref{archtable}). 
 
 \item Fast overflow checking: for integers, overflow has to be checked manually
 and this introduces at least 65\% overhead towards total runtime (Section
 \ref{sec:i16-overflow-checking}). This is because the x86 architecture does not
-provide status registers to indicate integer overflown. However, there is one
+provide status registers to indicate integer overflow. However, there is one
 for floating points, making floating points overflow detection almost free. 
 
 \end{enumerate}
@@ -252,7 +252,7 @@ single \texttt{AVX-512} register and addresses issues 1 and 2. However, overflow
 is still checked manually, causing 4 times more instruction count (Section
 \ref{sec:i16-overflow-checking}). Additionally, this approach introduces a new
 disadvantage, \texttt{AVX-512} extensions are required for the support for
-vectorized \dtshort{}, this is very rare among CPU manufactured in the last
+vectorized \dtshort{}, this is very rare among CPUs manufactured in the last
 decade (Section \ref{sec:avx512}). 
 
 An alternative approach is to do 23-bit or 52-bit integer operations using float
@@ -281,19 +281,19 @@ extension. It can also be adapted to fit even older \texttt{AVX-128} and
 \texttt{SSE} CPUs with minimal change in source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
-especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
+especially \texttt{Zen 4}, through a matrix element-wise fused-multiply-add toy
 example under the various configurations regarding vectorization methods, matrix
 data structures, element data types and data widths (Section \ref{sec:Toy}). 
 
 It is discovered that optimal performance can be achieved by selecting clang
-builtin vector type as vectorization methods and use flat list as matrix data
+builtin vector type as vectorization methods and use a flat list as matrix data
 structure. However, it is quite difficult to decide whether \dtshort{} or
 \dtfloat{} is better, because the former benefits form bigger vector size
-and less instruction count, while the latter has minimal overhead on overflow
+and less instruction count, while the latter has a minimal overhead on overflow
 checking. 
 
 Then two detached versions of \texttt{pivot} function from the Presburger
-library are built from the most optimal configurations derived form the toy
+library are built from the most optimal configurations derived from the toy
 example, one using \dtshort{} and the other using \dtfloat{}. Some
 further optimizations were made by inspecting \texttt{perf} reports and
 assembly, including: 
@@ -302,24 +302,29 @@ assembly, including:
     \item Implementing matrix-wise transprecision computing 
     \item Double buffering
     \item Aligning the matrix to the size of vector registers
-    \item Reducing number of matrix index computation
+    \item Reducing the number of matrix index computation
     \item Specialization for different row sizes
 \end{compactlist}
 
-After applying these optimizations, a benchmark is setup targeting a selected
-30-row matrix. The column of the matrix can be configured to be 8, 16, 24 or 32.
-In the case of 24 columns, which is considered to be the most representative
-case~\cite{FPL1}, it is discovered that: 
+After applying these optimizations, a benchmark is set up for a
+selected 30-row and 19-column matrix. The achievements are: 
 \begin{enumerate}
-    \item \dtfloat{} does not provide a performance advantage over \dtshort{}.
-    Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
-    Nevertheless, both of them significantly outperform the upstream scalar
-    implementation, which renders the 6 ns gap trivial. 
-    \item Additionally, \dtfloat{} offers substantial compatibility advantage
-    over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
+    \item The vectorized \dtfloat{} implementation of \pivot{} significantly
+    outperforms the upstream. Specifically, it takes only 26 ns, while the
+    runtime of the upstream implementation is 550 ns. 
+    % ,  \dtshort{} completes 6 ns ahead.
+    % , which renders the 6 ns gap trivial. 
+    \item The \dtfloat{} implementation offers substantial compatibility
+    advantage over \dtshort{} for the vast amount of non-\texttt{AVX-512}
+    platforms. Even though the \dtshort{} version is 6 ns faster than the
+    \dtfloat{} version, the significant improvement from the upstream 
+    together with \texttt{AVX-2}'s compatibility
+    renders the 6 ns gap trivial. 
 \end{enumerate}
 
-
+%The column of the matrix can be configured to be 8, 16, 24 or 32.
+% In the case of 24 columns, which is considered to be the most representative
+% case~\cite{FPL1}
 
 \chapter{Background}
 \section{Linear Programming and Simplex Algorithm}
@@ -372,8 +377,8 @@ The simplex algorithm is an iterative approach to find \begin{math} x_1 \, ...
 \, x_n\end{math} that maximizes the objective function while satisfying
 constraints at the same time. The matrix goes through a sequence of
 transformations, until the solution appears or the solution is not feasible. The
-transformations are called ``pivot'', and it solves the linear equation at pivot
-row for the variable at pivot column: 
+transformations are called ``pivot'', and it solves the linear equation at the pivot
+row for the variable at the pivot column: 
 \vspace*{-4mm}
 \begin{table}[H]
 \begin{center}
@@ -389,8 +394,8 @@ Other entries         & $\delta$ & $\rightarrow$ & $\delta - \frac{\beta\gamma}{
 
 The pivot transformation involves division, and thereby produces rational
 numbers. Rationals of base 10 cannot be expressed as binary floating points
-precisely due to inaccuracy caused by potential rounding. In addition, division
-is an expensive operation comparing to addition or multiplication. This issue
+precisely due to inaccuracy caused by potential rounding. In addition, divisions
+are expensive operations comparing to additions or multiplications. This issue
 can be addressed through demoralizing each row by multiplying each row with
 their common denominator~\cite{FPL1}: 
 \vspace*{-4mm}
@@ -442,7 +447,7 @@ and can be implemented in these procedures:
     \item Subtract $\beta_n\gamma_n$ to every non-pivot row.
 \end{compactlist}
 
-\section{Presburger library}
+\section{Presburger Library}
 \label{sec:presburger}
 % \subsection{Overview}
 
@@ -468,10 +473,10 @@ single instruction.
 \end{figure}
 
 
-However, in rare and corner cases, there can be larger coefficients up to 127
+However, in rare and corner cases, there can be larger coefficients of up to 127
 bits. Practically, the upper bound of coefficient size is unknown, making it
 required to have arbitrary precision arithmetic \texttt{LargeInteger} as a
-backup. Also, the maximum observed column count is 28 and there is not a certain
+backup. Also, the maximum observed column count is 28 and there is no certain
 maximum column count as well. 
 
 The FPL paper presents a 3-way transprecision implementation for the Presburger
@@ -485,8 +490,8 @@ version is not merged with the upstream for two reasons:
 \begin{compactlist} 
     \item \dtshort{} vectors require \texttt{AVX-512} ISA extension, but hardware
     support is rare (Section \ref{sec:avx512}). 
-    \item Despite the \dtshort{} version is fast, overflow checking overhead is
-    65\%~\cite{FPL2}. Using floating points could significantly reduce this
+    \item Despite the \dtshort{} version being fast, overflow checking overhead
+    is 65\%~\cite{FPL2}. Using floating points could significantly reduce this
     overhead and potentially be faster (Section \ref{sec:i23}).  
 \end{compactlist}
 
@@ -495,14 +500,14 @@ version is not merged with the upstream for two reasons:
     \begin{center}
         %\captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/transprecision.png}
-    \caption{The The architecture of FPL. The focus of this report is the
+    \caption{The architecture of FPL. The focus of this report is the
     ``Simplex'' method of the ``Core Algorithms'', since it is the main
     performance bottleneck.~\cite{FPL2}}
     \label{fig:fpl_arch}
     \end{center}
 \end{figure}
 
-\section{Modern CPU micro-architecture}
+\section{Modern CPU Micro-architecture}
 \label{sec:avx512}
 
 A recent trend in x86-64 architecture’s development is to include \texttt{AVX-512}
@@ -510,7 +515,7 @@ instruction set architecture (ISA) extension. \texttt{AVX-512} succeeds \texttt{
 width is increased from \texttt{AVX-2}’s 256 bits to 512 bits. \texttt{AVX-512} also provides new
 instructions, for example, \dtshort{} saturated addition.
 
-\subsection{Intel}
+% \subsection{Intel}
 
 Even though its specification was released by Intel in 2013, it had been
 unpopular ~\cite{linusHopeAvx512Die}, as it did not bring practical performance
@@ -530,7 +535,7 @@ Intel attempted to mitigate this problem by introducing the
 instructions is encountered, the CPU automatically enters the
 \texttt{AVX-offset} mode and reduces its clock frequency \cite{AVX-offset}. This
 solution only works in theoretical benchmarks where \texttt{AVX-512}
-instructions presents in large bulk, but in practice it is more common to have a
+instructions present in large bulk, but in practice, it is more common to have a
 mix of control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions. The
 clock frequency of executing those non-\texttt{AVX-512} instructions is
 decreased together with \texttt{AVX-512} instructions, causing many workloads
@@ -540,22 +545,22 @@ frequency~\cite{Zen4Critique}.
 \hlc[pink]{OptionalTODO: alderlake disabled avx-512 for big.LITTLE}
 
 
-\subsection{AMD}
+% \subsection{AMD}
 AMD recently decides to add support for \texttt{AVX-512} in their latest
-micro-architecture Zen4. It has slightly less computing power comparing with
-Intel, but much more efficient. Zen4 can be considered as modernized version of
-Zen3 or Zen2, where Zen2 and Zen3 supports \texttt{AVX-2}  by providing 2 FADD
+micro-architecture Zen 4. It has slightly less computing power compared with
+Intel, but much more efficient. Zen 4 can be considered as the modernized version of
+Zen 3 or Zen 2, where Zen 2 and Zen 3 support \texttt{AVX-2}  by providing 2 FADD
 units \footnote{Floating-point add units (FADD) can execute addition
 instructions only. They may be considered as simplified FMA} and 2 FMA units of
-256-bit width \cite{Zen2ChipWiki}. Zen4 ``double-pumps'' these existing circuits
+256-bit width \cite{Zen2ChipWiki}. Zen 4 ``double-pumps'' these existing circuits
 to create a single 512-bit FADD and a single 512-bit FMA, without introducing
-any new arithmetic units ~\cite{Zen4Critique}. Zen2 and Zen3 are reputable for
-its high performance per watt~\cite{ZenPerfPerWatt}, and Zen4 would be better
+any new arithmetic units ~\cite{Zen4Critique}. Zen 2 and Zen 3 are reputable for
+their high performance per watt~\cite{ZenPerfPerWatt}, and Zen 4 would be better
 with its more advanced lithography~\cite{Zen4Critique}.
 
 Additionally, rebuilding existing software to target \texttt{AVX-512} may bring
 slight performance improvement. One benefit of \texttt{AVX-512} is that it
-reduces front-end pressure. In the case of the Zen4 micro-architecture, though
+reduces front-end pressure. In the case of the Zen 4 micro-architecture, though
 the back-end is possible to commit 2 \texttt{AVX-2} FADD and 2 \texttt{AVX-2}
 FMA every cycle, the front-end has to dispatch 4 instructions per cycle, which
 is quite difficult. The equivalency in \texttt{AVX-512} only takes 2
@@ -563,7 +568,7 @@ instructions, this is much more likely to be sustained by the
 frontend~\cite{Zen4Critique}.
 
 
-\section{Floating points}
+\section{Floating Points}
 \label{sec:i23}
 \subsection{IEEE 754}
 \label{sec:IEEE754}
@@ -623,8 +628,8 @@ created:
 \begin{math}C\end{math} are the operands, 
 \begin{math}Y\end{math} is the result~\cite{CARD}.
 
-FMA saves cycles and reduces accumulation of rounding errors, while at the same
-time not adding significant complexity to the circuit. A FMA execution unit is
+FMA saves cycles and reduces the accumulation of rounding errors, while at the same
+time not adding significant complexity to the circuit. An FMA execution unit is
 capable to do FMUL, FADD, and FSUB as well: 
 \begin{compactlist} 
 \item[] Addition: \begin{math}Y = (A * 1.0) + C \end{math} 
@@ -633,38 +638,42 @@ capable to do FMUL, FADD, and FSUB as well:
 \end{compactlist} 
 
 This is a useful feature in many numerical computations that involve
-simultaneous multiplication and addition operations, such as dot produpreliminaryct and
-matrix multiplication. Since the \pivot{} function performs multiplication and
-addition between the pivot row, some constant value and each row in the matrix,
+simultaneous multiplication and addition operations, such as dot products and
+matrix multiplications. Since the \pivot{} function performs multiplications and
+additions between the pivot row, some constant value and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
 
-\subsection{Representing ``\texttt{int23\_t}'' and ``\texttt{int52\_t}'' using
-floating points}
+\subsection{Representing ``\texttt{int23\_t}'' and ``\texttt{int52\_t}'' Using
+Floating Points}
 \label{sec:fpe2}
 
 There is a common stereotype that floating-point numbers are unreliable and
-likely to be imprecise, and are often illustrated in popular memes (as shown in
-Figure \ref{meme}). However, when storing integer values inside floating points, 
-floating points can be quite reliable. 
+likely to be imprecise, and are often illustrated in popular memes as shown in
+Figure \ref{meme}~\cite{meme}. However, when storing integer values inside
+floating points, floating points can be quite reliable. In fact, historically
+floating point processing units in GPUs have been utilized for fast integer
+arithmetic, for example, modular exponentiation \cite{intfpu-modexp} and RSA
+algorithms~\cite{intfpu-rsa}, because often the architecture of GPU prioritizes
+the performance of floating points rather than integers. 
 
-Specifically, given that the mantissa part of a float consists of 23 bits,
-inexactness never occur when representing integers less than 23 bits (ignoring
-the sign bit). Furthermore, in case of of an integer overflow, floating point
-imprecision almost always occurs and a corresponding status registers is set.
+Given that the mantissa part of a float consists of 23 bits,
+inexactness never occurs when representing integers less than 23 bits (ignoring
+the sign bit). Furthermore, in case of an integer overflow, floating point
+imprecision almost always occurs and a corresponding status register is set.
 The same concept applies to double data types, which have a mantissa consisting
 of 52 bits.
 
 This mechanism is reliable, as floating-point inexactness always implies
-integer-inexactness. For a integer value with bit width greater than the
-mantissa size, floating point rounding is triggered in order to fit most
+integer-inexactness. For an integer value with a bit width greater than the
+mantissa size, floating point rounding is triggered to fit the most
 significant bits of the integer in the mantissa, and then adjust the order of
 magnitude in the exponent accordingly. The lower bits of the mantissa are
 truncated, therefore causing imprecision. 
 
 In some rare cases, integers longer than the size of mantissa can be represented
-in floating points precisely. An examples of such numbers are large powers of 2,
-like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \dtfloat{}
-is:
+in floating points precisely. An example of such numbers is a very large power
+of 2, like \texttt{2\^{}30 = 0x40000000}. Its binary representation in
+\dtfloat{} is:
 \begin{VerbatimCompact}
 Sign     = 0b0        -> 0     
 Exponent = 0b10011011 -> 0b10011011 - 127 = 155 - 127 = 28             
@@ -672,28 +681,25 @@ Mantissa = 0b0        -> 0b1.0 = 1
 \end{VerbatimCompact}
 % -1^0 * 2^28 * 1 = 2^28 
 Despite being greater than the size of
-the mantissa, they are normalized rather then being rounded, and therefore does
-not break the mechanism of representing integer in floating-points.
+the mantissa, they are normalized rather than being rounded, and therefore does
+not break the mechanism of representing integers in floating points.
 
-Throughout history, floating point processing units in GPUs have been utilized
-for fast integer arithmetic, for example, modular exponentiation
-\cite{intfpu-modexp} and RSA algorithms~\cite{intfpu-rsa}, because often the
-architecture of GPU prioritizes floating points performance rather than
-integers. 
+
 % \hl{TODO: place this paragraph here?}
 
 
 \begin{figure}
 \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/0.3004.jpg}
-    \caption{A floating point meme: \texttt{0.1 + 0.2 = 0.30000000000000004}}
+    \caption{A floating point meme: \texttt{0.1 + 0.2 =
+    0.30000000000000004}~\cite{meme}}
     \label{meme}
 \end{center}
 \end{figure}
 
 \section{Google Benchmark}
 Google benchmark is a library to measure the performance of a code snippet. It
-provides unit-test like interfaces to setup benchmarks around a code snippet
+provides unit-test-like interfaces to set up benchmarks around a code snippet
 \cite{googlebench}. The given example from https://github.com/google/benchmark
 is self-explanatory for its usage: 
 
@@ -714,15 +720,15 @@ BENCHMARK_MAIN();
 \end{verbatim}
 
 The library first starts a timer, repeatedly executes its core loop: \texttt{for
-(auto \_ : state) ... } multiple times then pauses the timer. This method
+(auto \char`_ : state) ... } multiple times then pauses the timer. This method
 ensures that the results are consistent and minimizes the overhead required for
 recording the timing information. 
 
-Executing the benchmarks will not only report both elapsed real time and CPU
+Executing the benchmarks will not only report both elapsed real-time and CPU
 time, but also much other useful information to help reduce variance. 
 \begin{verbatim}
 Running ./build/example
-***WARNING*** CPU scaling is enabled, the benchmark real time 
+***WARNING*** CPU scaling is enabled, the benchmark real-time 
 measurements may be noisy and will incur extra overhead.
 Run on (32 X 5800.00 MHz CPU s)
 CPU Caches:
@@ -740,7 +746,7 @@ BM_SomeFunction       18.5 ns         18.5 ns     37935734
 The warning: ``CPU scaling is enabled, the benchmark real-time measurements may
 be noisy and will incur extra overhead.'' is saying that CPU clock frequency is
 not consistent. It can be dynamically determined by the governor algorithm,
-according on the system's needs. For example, with the \texttt{performance}
+according to the system's needs. For example, with the \texttt{performance}
 governor, the OS locks the CPU to the highest possible clock frequency,
 specified at \texttt{/sys/devices/system/cpu/cpu*/cpufreq/scaling\_max\_freq},
 while the \texttt{ondemand} governor will push the CPU to the highest frequency
@@ -751,10 +757,10 @@ However, it is also dependent on the manufacture and other hardware constraints.
 By default, both Intel (Turbo Boost) and AMD (Precision Boost Overdrive) have
 support for raising clock frequency, beyond the control of the governor
 \cite{GoogleBenchReduceVariance}. On the other hand, CPUs have self-protecting
-thermal throttling mechanisms that reduces its clock frequency and voltage when
+thermal throttling mechanisms that reduce its clock frequency and voltage when
 it is too hot. 
 
-The benchmark mentioned in this report were performed on a AMD 7950x desktop
+The benchmark mentioned in this report were performed on an AMD 7950x desktop
 computer. The computer system went through the following these setups for
 consistent results:
 \begin{compactlist}
@@ -768,9 +774,9 @@ consistent results:
 
 \section{\mca{}}
 
-\mca{}, LLVM Machine Code Analyzer, is a tool to analyze performance of executing
-some instructions on a specific CPU micro-architecture, according to scheduling
-information provided by LLVM~\cite{llvm-mca}. 
+\mca{}, LLVM Machine Code Analyzer, is a tool to analyze the performance of
+executing some instructions on a specific CPU micro-architecture, according to
+scheduling information provided by LLVM~\cite{llvm-mca}. 
 
 By supplying \mca{} with a piece of assembly code and the target
 micro-architecture codename, \mca{} reports various metrics to indicate how fast
@@ -786,7 +792,7 @@ timeline helps understand the capability of complicated out-of-order superscalar
 architecture. 
 
 An example is provided below. The analysis from \mca{} indicates that a \texttt{znver2}
-(Zen2) CPU can repeatedly execute a combination of 
+(Zen 2) CPU can repeatedly execute a combination of 
 \texttt{vmovaps}\footnote{\texttt{vmovaps} can be either vector float load or 
 store instruction, depending on how operands are structured.}
 and \texttt{vfmadd213ps}\footnote{\texttt{vfmadd213ps} is the instruction for 
@@ -915,7 +921,7 @@ Index 0123456789          012345
 % \end{verbatim}
 
 However, when evaluating the identical assembly code on a more advanced
-micro-architecture \texttt{znver3} (Zen3), \mca{} reveals reduction in IPC and
+micro-architecture \texttt{znver3} (Zen 3), \mca{} reveals reduction in IPC and
 throughput. This appears to be contradictory with both theoretical expectations
 and actual benchmarks. After submitting an
 \href{https://github.com/llvm/llvm-project/issues/59325}{issue}
@@ -939,7 +945,7 @@ do vector add or vector FMA with various setups, including:
     \item Vectorization method 
         \begin{compactlist} 
             \item Clang's automatic vectorization from scalar source code
-            \item Clang builtin vector datatype with occasional AVX intrinsics 
+            \item Writing source code using clang's vector type extension
         \end{compactlist}
     \item Matrix data structure 
         \begin{compactlist} 
@@ -959,9 +965,9 @@ do vector add or vector FMA with various setups, including:
         \end{compactlist}
 \end{enumerate}
 
-\section{Vectorization method}
+\section{Vectorization Method}
 \label{sec:vectorization-method}
-\subsection{Clang's automatic vectorization}
+\subsection{Clang's Automatic Vectorization}
 Clang is capable of generating vectorized instructions from scalar source code,
 using the flags \texttt{-O3 -march=native} on a platform with vector ISA
 enabled. Starting with an example (Listing \ref{vec-add-float-auto}), the simple
@@ -1002,7 +1008,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 \end{tabular}
 \caption{The vectorized and scalar binary are derived by compiling with flags
 \texttt{-O3 -march=native} and \texttt{-O3 -march=native -mno-avx -mno-sse}
-respectively, on a Zen4 computer with \texttt{clang-15}.}
+respectively, on a Zen 4 computer with \texttt{clang-15}.}
 \label{vec-add-float-auto}
 \end{table}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
@@ -1019,7 +1025,7 @@ scalar instructions \texttt{fadds}, \texttt{fstps} and \texttt{flds} are
 selected.
 
 
-\subsection{Clang's vector datatype and AVX intrinsics}
+\subsection{Clang's Vector Data Type}
 
 Another approach is to write source code with vectorization in mind in the first
 place. Clang provides extension that allows programmers to declare a new type
@@ -1036,7 +1042,7 @@ typedef int16_t int16x32 __attribute__((ext_vector_type(32)))
 defines a 512-bit vector type of \texttt{int16x32}, consisting of 32
 \texttt{int16\char`_t} and fits inside an \texttt{AVX-512} ZMM register. 
 
-After defining a vector datatype, a vector variable can be created by casting
+After defining a vector data type, a vector variable can be created by casting
 from a pointer of the target array. Then arithmetic operators can be applied
 between the vectors to performed element-wise operations. The previous
 \texttt{vec\_add} example can be rewritten as the code snippet shown in Listing
@@ -1267,7 +1273,7 @@ scalar version, but writing vector type guarantees vectorization. }
 
 
 
-\section{Matrix data structure}
+\section{Matrix Data Structure}
 \label{sec:mat-structure}
 The most intuitive data structure of a matrix is a list of lists, where each
 list represents a row and a list of rows is a matrix. In C++ this can be
@@ -1368,7 +1374,7 @@ nested list implementation.  }
 \end{figure}
 
 
-\section{Matrix element data type}
+\section{Matrix Element Data Type}
 
 
 \subsection{Width}
@@ -1378,7 +1384,7 @@ using shorter data types can be more advantageous than longer ones because they
 allow more numbers to be packed into a single vector register (Figure
 \ref{archtable}). The number of instructions can be cut by half when data width
 is reduced to half, and less instruction count always leads to less execution
-time. Given that the Zen4 micro-architecture provides approximately same amount
+time. Given that the Zen 4 micro-architecture provides approximately same amount
 of execution units for both integers and floating points, it is reasonable to
 estimate that the execution time is inversely proportional to the bit width of
 data type. As confirmed in Figure \ref{bench_datatype}, when overflow is
@@ -1412,13 +1418,13 @@ checking for integer is much more expensive then floating points. }
 \begin{figure}[H]\captionsetup{name=Figure}
 %\captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/arch-table.png}
-    \caption{A summary of features and resources provided by the Zen4
+    \caption{A summary of features and resources provided by the Zen 4
     micro-architecture for different data
     types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
     \label{archtable}
 \end{figure}
 
-\subsection{Overflow checking for integers}
+\subsection{Overflow Checking for Integers}
 \label{sec:overflow-int}
 
 The x86-64 micro-architecture provides the \texttt{seto} instruction to set some
@@ -1442,7 +1448,7 @@ worse performance.
 One advantage of \dtshort{} is that it can be used with \texttt{AVX-512}'s
 saturated add and multiply higher bits vector instructions (Figure 
 \ref{archtable}), making it possible and convenient to write vectorized and
-overflow-aware code. However, Zen4's implementation of \texttt{AVX-512} extension does
+overflow-aware code. However, Zen 4's implementation of \texttt{AVX-512} extension does
 not provide equivalent instruction for \dtint{} or \dtlong{},
 and therefore must be processed as scalar values.
 % When the
@@ -1451,7 +1457,7 @@ and therefore must be processed as scalar values.
 % overflow. 
 
 
-\subsubsection{Implementation of vectorized \dtshort{} overflow checking}
+\subsubsection{Implementation of Vectorized \dtshort{} Overflow Checking}
 \label{sec:i16-overflow-checking}
 By comparing the result of a conventional addition and saturated addition, it
 indicates whether an addition has gone overflown or not. In case of overflow,
@@ -1544,7 +1550,7 @@ these functions is a boolean that indicates whether an overflow occurred during
 the operation.
 
 
-\subsection{Overflow checking for floating points}
+\subsection{Overflow Checking for Floating Points}
 \label{sec:overflow-float}
 To detect floating point overflow or imprecision, one approach is to enable
 floating point imprecision as a trap, then upon overflow, the interrupt \sigfpe{}
@@ -1709,7 +1715,7 @@ of the actual \pivot{} function, float may potentially outperform int16.
 
 \chapter{Implementation and Optimization of \pivot{}}
 
-\section{Matrix-wise transprecision}
+\section{Matrix-wise Transprecision}
 Transprecision techniques can be implemented at different levels of scale, such
 as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
 are implemented using the matrix-wise transprecision style. For \dtfloat{},
@@ -1733,7 +1739,7 @@ operator OR is applied between that overflow checking result register and a
 overflow flag. 
 
 
-\section{Double buffering}
+\section{Double Buffering}
 
 Double buffering is a powerful technique to address the issue of data pollution
 caused by overflown data. When matrix-wise computing is carried out, a potential
@@ -1754,7 +1760,7 @@ protecting the original data from pollution, double buffering is a superior
 technique due that it does not introduce additional memory operations. With
 double buffering, every operand requires a load operation from the input matrix,
 and every result takes a store operation to be written into the output matrix.
-This is the minimal amount of memory operation required for arithmetics. Zen4 is
+This is the minimal amount of memory operation required for arithmetics. Zen 4 is
 capable of loading one \zmm{} vector per cycle and storing one \zmm{} vector per two
 cycles. In comparison, it can do two multiplication or addition of \zmm{}
 vectors every cycle. The discrepancy in throughput between computing and IO
@@ -1770,7 +1776,7 @@ and \texttt{instruction} for
 
 Unaligned load may bring potential performance impacts. When accessing memory,
 the CPU retrieves data from the main memory or cache in units of cache lines. On
-Zen4 the size of cache line is 512-bits, exactly the size of a \zmm{} register
+Zen 4 the size of cache line is 512-bits, exactly the size of a \zmm{} register
 \cite{AMDManual}. Alignment guarantees that a single cache line can cover a
 vector register. Otherwise, a \zmm{} register might be spitted on two cache lines.
 Both cache lines of 1028 bits have to be requested from the memory, then
@@ -1782,7 +1788,7 @@ To address this issue, an aligned allocator is given to the constructor of
 and issue aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps}
 accordingly. 
 
-\section{Reduce number of matrix index computation}
+\section{Reduce Number of Matrix Index Computation}
 \label{sec:optmz-get-index}
 
 Section \ref{sec:mat-structure} discussed the benefits of using a single
@@ -1798,21 +1804,22 @@ be indexed by incrementing the address.
 
 
 
-\section{Vector size specialization}
+\section{Column Size Specialization}
 
-Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
-columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. A
-\ymm{} register can pack 8 \dtfloat{}s, and a \zmm{} register can pack 16
-\dtfloat{}s (Figure \ref{archtable}). When padding each row of the matrix to 32
-columns using 2 \zmm{} registers, at least 12 \dtfloat{}s are wasted.
-Alternatively, the rows can be padded to 24 columns using 3 \ymm{} registers,
-and reducing the minimal padding size to 4 \dtfloat{}s.
+Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less
+than 20 columns while 75\% of the matrices have more than 18
+columns~\cite{FPL1}. A \ymm{} register can pack 8 \dtfloat{}s, and a \zmm{}
+register can pack 16 \dtfloat{}s (Figure \ref{archtable}). When padding each row
+of the matrix to 32 columns using 2 \zmm{} registers, at least 12 \dtfloat{}s
+are wasted. Alternatively, the rows can be padded to 24 columns using 3 \ymm{}
+registers, and reducing the minimal padding size to 4 \dtfloat{}s.
 
 Since \ymm{} registers have double amount of execution units than \zmm{}
 registers, while there will be only 50\% more instruction count, specialize the
 most of the cases of less than 24 columns with 3 \ymm{} registers is expected to
 be faster than a more genetic implementation of 32 columns and 2 \zmm{}
-registers. Benchmark (Figure \ref{fig:specialization}) shows that 
+registers. Benchmark illustrated in Figure \ref{fig:specialization} confirms
+with the expectation. 
 
 % to represent 24 columns 
 % for , the performance of 
