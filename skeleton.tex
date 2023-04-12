@@ -114,7 +114,7 @@ The current approach cannot be automatically vectorized by compiler,
 and \dtlong{} has a much larger bit width than what is
 typically used for most of the items in the matrix.
 Additionally, extra arithmetics are required to perform overflow checking 
-for \dtlong{}, resulting in significant performance overhead. 
+for integers, resulting in significant overhead. 
 This report ``innovates'' the
 \dtfloati{}
 % \footnote{This is not really a innovation. It it a common
@@ -123,8 +123,7 @@ This report ``innovates'' the
 datatype, a 23-bit integer datatype created from the 23-bit mantissa of a
 32-bit floating point, to address these issues. 
 \texttt{int23\_t} overflow can be captured as floating point imprecision by a
-status register, and the cost of reading the status register can be as low as 1
-ns, making overflow awareness almost free.  
+status register, making overflow awareness almost free.  
 On a selected 30-row by 20-column representative input matrix, the runtime of
 is reduced from 550 ns to 26 ns, achieving 20 times speedup.
 
@@ -1335,7 +1334,7 @@ function can be optimized to only compute index once (See Section
 16 rows, the nested vector matrix is about 8 ns faster than the flat matrix.
 
 \begin{figure}
-    \includegraphics[width=40mm]{image/nested-flat.jpg}
+    \includegraphics[width=\linewidth]{image/nested-flat.jpg}
     \caption{\hl{TODO: write caption}}
     \label{fig:nested-flat}
 \end{figure}
