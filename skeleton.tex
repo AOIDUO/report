@@ -116,10 +116,11 @@ typically used for most of the items in the matrix.
 Additionally, extra arithmetics are required to perform overflow checking 
 for \dtlong{}, resulting in significant performance overhead. 
 This report ``innovates'' the
-\dtfloati{}\footnote{This is not really a innovation. It it a common
-technique on GPUs because often they are more capable on floating points than
-integers. See Section \ref{sec:introduction} for more history and detail. }
-datatype, a 23-bit integer datatype that utilizes the 23-bit mantissa of a
+\dtfloati{}
+% \footnote{This is not really a innovation. It it a common
+% technique on GPUs because often they are more capable on floating points than
+% integers. See Section \ref{sec:introduction} for more history and detail. }
+datatype, a 23-bit integer datatype created from the 23-bit mantissa of a
 32-bit floating point, to address these issues. 
 \texttt{int23\_t} overflow can be captured as floating point imprecision by a
 status register, and the cost of reading the status register can be as low as 1
@@ -192,8 +193,8 @@ library provides polyhedral compilation techniques to make dependence analysis
 and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
 Presburger arithmetics involves determining whether conjunction of linear
 arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
-simplex method of linear programming, with its core function \pivot{} consumes
-\hl{TODO: find the number} \%~\cite{FPL1} of the runtime. 
+simplex method of linear programming, with its core function \pivot{} is the
+main performance bottleneck~\cite{FPL1}. 
 
 The \texttt{pivot} function involves two multiplication and one addition
 operation on every element in a matrix. Notably, the input matrices for this
@@ -307,7 +308,7 @@ assembly, including:
     \item Vector size specialization
 \end{compactlist}
 
-\hl{TODO: Update here after Integrating into library}
+\hl{TODO: Update here with final performance figure}
 
 
 
@@ -339,14 +340,15 @@ where \begin{math}x_1 \,...\, x_n\end{math} are the variables,
 \begin{math}c_1 \,...\, c_n\end{math} are the coefficients of the objective function, 
 and non-negative \begin{math}a_{11}, a_{12} \,...\, a_{21} \,...\ a_{m1} \,...\, a_{mn}\end{math}
 together with \begin{math}b_1 \,...\, b_m\end{math} encodes the constraints of
-the problem in a matrix. 
+the problem in a matrix \cite{simplex-example}. 
 
-% in a matrix of \begin{math}m\end{math} rows and
-% \begin{math}n+1\end{math} columns~\cite{FPL1}.
+To find \begin{math}
+x_1 \, ... \, x_n\end{math} that maximizes the objective function while 
+satisfying constraints at the same time, the matrix is transformed iteratively, 
+until the solution appears or the solution is not feasible. The transformations
+are called ``pivot'', and 
 
-https://people.richland.edu/james/ictcm/2006/simplex.html
 
-\hl{TODO: i am not sure how correct it is}
 
 The simplex method is an iterative approach that moves from one vertex of the
 feasible solution space to another, always improving the objective function 
