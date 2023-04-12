@@ -621,7 +621,7 @@ created:
 \begin{math}A\end{math},
 \begin{math}B\end{math} and
 \begin{math}C\end{math} are the operands, 
- \begin{math}Y\end{math} is the result~\cite{CARD}.
+\begin{math}Y\end{math} is the result~\cite{CARD}.
 
 FMA saves cycles and reduces accumulation of rounding errors, while at the same
 time not adding significant complexity to the circuit. A FMA execution unit is
@@ -1764,8 +1764,8 @@ suggests that memory copy very expensive and inefficient.
 In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
 assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. 
 \texttt{vmovups} for
-``Move Unaligned Packed Single-Precision Floating-Point Values''~\cite{vmovups},
-and \texttt{vmovdqu64} for 
+``Move Unaligned Packed Single-Precision Floating-Point Values''~\cite{instruction},
+and \texttt{instruction} for 
 ``Move Unaligned Packed Integer Values''~\cite{vmovdqu64}. 
 
 Unaligned load may bring potential performance impacts. When accessing memory,
@@ -1812,7 +1812,7 @@ Since \ymm{} registers have double amount of execution units than \zmm{}
 registers, while there will be only 50\% more instruction count, specialize the
 most of the cases of less than 24 columns with 3 \ymm{} registers is expected to
 be faster than a more genetic implementation of 32 columns and 2 \zmm{}
-registers.
+registers. Benchmark (Figure \ref{fig:specialization}) shows that 
 
 % to represent 24 columns 
 % for , the performance of 
@@ -1829,30 +1829,7 @@ registers.
 % To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
 % is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
 % represent a row. There are 16 combinations in total:
-% \vspace*{-4mm}
-% \begin{table}[H]
-% \centering
-% %\captionsetup{justification=centering}
-% % \begin{tabular}{lll}
-%     %    & \ymm{} register count & \zmm{} register count \\
-%     % Column $\leq$ 8  & 1   & 1   \\
-%     % Column $\leq$ 16 & 2   & 1   \\
-%     % Column $\leq$ 24 & 3   & 2   \\
-%     % Column $\leq$ 32 & 4   & 2  
-%     % \end{tabular}
-% \begin{tabular}{lllll}
-%     1. & \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-%     2. & \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
-%     3. & \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
-%     4. & \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
-%     \hline
-%     5. & \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-%     6. & \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
-%     7. & \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
-%     8. & \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
-%     \end{tabular}
-% \end{table}
-% \vspace*{-8mm}
+
 
 \begin{figure}[H]
     \begin{center}
@@ -1864,6 +1841,21 @@ registers.
 \end{figure}
 
 \section{Evaluation}
+\vspace*{-4mm}
+\begin{table}[H]
+\centering
+\begin{tabular}{lllll}
+    1. & \dtfloat{}, column count $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    2. & \dtfloat{}, column count $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
+    3. & \dtfloat{}, column count $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
+    4. & \dtfloat{}, column count $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
+    5. & \dtshort{}, column count $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    6. & \dtshort{}, column count $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
+    7. & \dtshort{}, column count $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
+    8. & \dtshort{}, column count $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
+    \end{tabular}
+\end{table}
+\vspace*{-8mm}
 
 % It is found that for matrices with small column sizes that fits 
 
@@ -1885,9 +1877,10 @@ registers.
 \chapter{Conclusion and Future work}
 
 \dthalf{} is a 16-bit floating point data structure, consistent of 1-bit sign,
-5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). The \dthalf{}i{}
-data type can be defined accordingly, and overflow would not occure for xx\% of
-the cases. 
+5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). 
+% The \dthalf{}i{}
+% data type can be defined accordingly, and overflow would not occure for xx\% of
+% the cases. 
 
 Now \dthalf{} has already been supported widely on GPUs for AI applications. It
 provides performance benefits over higher precision floating point formats, for
