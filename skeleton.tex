@@ -450,11 +450,19 @@ The Fast Presburger Library (FPL) paper collected 465,460 representative linear
 problems encountered during analyzing linear programs in cache analytical
 modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
-in the value of each element. Specifically, more than 99\% of the coefficients
-require less than 10 bits and 95\% of them are less than 20 columns~\cite{FPL1}.
-Thus, most of the rows fit inside a 512-bit vector register of 32
-\dtshort{} elements, and a row operation can be done in a single
-instruction. 
+in the value of each element~\cite{FPL1}. Specifically, more than 99\% of the
+coefficients require less than 10 bits and 95\% of them are less than 20 columns
+(Figure \ref{small-val-low-dim}). Thus, most of the rows fit inside a 512-bit
+vector register of 32 \dtshort{} elements, and a row operation can be done in a
+single instruction. 
+
+
+\begin{figure}
+    \includegraphics[width=\linewidth]{image/small-val-low-dim.png}
+    \caption{TODO.~\cite{FPL1}}
+    \label{small-val-low-dim}
+\end{figure}
+
 
 However, in rare and corner cases, there can be larger coefficients up to 127
 bits. Practically, the upper bound of coefficient size is unknown, making it
@@ -1771,7 +1779,7 @@ registers for a row reduces the minimal padding size to 4 \dtfloat{}s.
 
 To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
 is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
-represent a row, 16 combinations in total:
+represent a row. There are 16 combinations in total:
 \vspace*{-4mm}
 \begin{table}[H]
 \centering
@@ -1783,16 +1791,16 @@ represent a row, 16 combinations in total:
     % Column $\leq$ 24 & 3   & 2   \\
     % Column $\leq$ 32 & 4   & 2  
     % \end{tabular}
-\begin{tabular}{llll}
-    \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
-    \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
-    \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
+\begin{tabular}{lllll}
+    1. & \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    2. & \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
+    3. & \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
+    4. & \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
     \hline
-    \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
-    \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
-    \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
+    5. & \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    6. & \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
+    7. & \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
+    8. & \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
     \end{tabular}
 \end{table}
 \vspace*{-8mm}
@@ -1805,6 +1813,25 @@ represent a row, 16 combinations in total:
     \caption{\hl{TODO: write caption}}
     \label{fig:specialization}
 \end{figure}
+
+\section{Evaluation}
+
+% It is found that for matrices with small column sizes that fits 
+
+Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
+columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. Thus
+the number of columns of a matrix is very likely to be between 16 and 24, and the 
+perform 
+
+% unfortunately \dtfloat{} does not provide a performance advantage over \dtshort{}.
+
+
+    % Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
+    % Nevertheless, both of them significantly outperform the upstream scalar
+    % implementation, which renders the 6 ns gap trivial. 
+    % Additionally, \dtfloat{} offers substantial compatibility advantage
+    % over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
+
 
 \chapter{Conclusion and Future work}
 
