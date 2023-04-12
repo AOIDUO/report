@@ -342,6 +342,22 @@ and non-negative \begin{math}a_{11}, a_{12} \,...\, a_{21} \,...\ a_{m1} \,...\,
 together with \begin{math}b_1 \,...\, b_m\end{math} encodes the constraints of
 the problem in a matrix \cite{simplex-example}. 
 
+% For example, the constraints 
+% \begin{math}
+% x_1 + x_2 \geq 10
+% \end{math}
+% and 
+% \begin{math}
+% 7x_1 - 4x_2 \leq 5
+% \end{math} can be normalized into 
+% \begin{math}
+% x_1 + x_2 - 10 \geq 0
+% \end{math}
+% and 
+% \begin{math}
+% -7x_1 + 4x_2 + 5 \geq 0
+% \end{math}
+    
 To find \begin{math}
 x_1 \, ... \, x_n\end{math} that maximizes the objective function while 
 satisfying constraints at the same time, the matrix is transformed iteratively, 
@@ -909,7 +925,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 respectively, on a Zen4 computer with \texttt{clang-17}.}
 \label{vec-add-float-auto}
 \end{table}
-\hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
+% \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
 After compiling on a \texttt{AVX-512} enabled computer and disassembling the binary, it
 is observed that clang automatically packs 16 \dtfloat{} (512 bits) as a
@@ -970,15 +986,6 @@ complicated to code with vector types.}
 \end{table}
 \subsection{Evaluation}
 
-\begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
-    \begin{center}
-    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
-    \end{center}
-    \caption{www}
-    \label{plot_vectorization_method}
-\end{figure}
-
 \label{sec:vectorization-method-eval}
 When comparing the performance of code written with and without the vector type
 and examining their assembly, it has been discovered that the the automatic
@@ -987,30 +994,17 @@ behaviors. It operates as a black box and may take a lot of effort to understand
 its mechanisms. One of the issues is that clang may select a suboptimal vector
 width.
 
-Consider the \texttt{vec\_fma} function in Listing
-\ref{table:vec-fma-float}, a slightly
-more complicated version of the previous \texttt{vec\_add} example, where an
-additional array is introduced and the element-wise operation is changed from
-addition to FMA. The disassembly reveals that clang decides to use FMA vector
-instructions of 128-bit width, but when vector size is constrained to 512-bit
-width by defining a vector type, more optimal binary can be generated. Benchmark
-indicates that the 512-bit vector width version is xx\% faster.  
-\hl{TODO: make plot and determine this number}
+Consider the \texttt{vec\_fma} function in Listing \ref{table:vec-fma-float}, a
+slightly more complicated version of the previous \texttt{vec\_add} example,
+where an additional array is introduced and the element-wise operation is
+changed from addition to FMA. The disassembly reveals that clang decides to use
+FMA vector instructions of 128-bit width, but when vector size is constrained to
+a bigger width by defining a vector type, more optimal binary can be generated.
+Benchmark (Figure \ref{plot_vectorization_method}) shows that the vector type
+version is 6 times and 11 times faster than the automatic vectorization and
+vectorization disabled version respectively, but automatic vectorization only
+provides less than 2x performance boost from the scalar version. 
 
-
-
-% 80e4: c5 fa 10 04 b2       	vmovss (%rdx,%rsi,4),%xmm0
-% 80e9: 43 8d b4 2f 8b 00 00 	lea    0x8b(%r15,%r13,1),%esi
-% 80f0: 00 
-% 80f1: c5 fa 10 0c 81       	vmovss (%rcx,%rax,4),%xmm1
-% 80f6: 43 8d 84 2b 8a 00 00 	lea    0x8a(%r11,%r13,1),%eax
-% 80fd: 00 
-% 80fe: c4 c2 79 a9 0c b8    	vfmadd213ss (%r8,%rdi,4),%xmm0,%xmm1
-% 8104: 42 8d bc 2b 8b 00 00 	lea    0x8b(%rbx,%r13,1),%edi
-% 810b: 00 
-% 810c: c4 c1 7a 11 0c 81    	vmovss %xmm1,(%r9,%rax,4)
-% 8112: 43 8d 84 2e 8b 00 00 	lea    0x8b(%r14,%r13,1),%eax
-% 8119: 00 
 
 \begin{table}[H]\captionsetup{name=Listing}
 \captionsetup{justification=centering}
@@ -1082,11 +1076,11 @@ registers respectively.}
 In some cases clang could be even worse, it may fail to recognize vectorization
 patterns from element-wise loop operations, leading to more reduction in
 performance. In the \texttt{vec\_fma} example, by changing the type signature
-from \dtfloat{} to \texttt{int}, clang decides to dispatch scalar
-instructions for addition (\texttt{add}) and multiplication (\texttt{imul})
-completely (Listing \ref{vec-fma-int}). Their vectorized equivalency
-\texttt{vpaddd} and \texttt{vpmulld} are more performant options. (Listing
-\ref{vec-fma-int}).
+from \dtfloat{} to \texttt{int}, clang decides to dispatch scalar instructions
+for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
+(Listing \ref{vec-fma-int}). Their vectorized equivalency \texttt{vpaddd} and
+\texttt{vpmulld} (Listing \ref{vec-fma-int}) are 15 times more performant (Figure
+\ref{plot_vectorization_method}).
 
 \begin{table}[H]\captionsetup{name=Listing}
 \captionsetup{justification=centering}
@@ -1151,26 +1145,22 @@ void vec_fma(int* src1_ptr, int* src2_ptr,
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{Clang (version 17) fails to vectorize the loop that iterates through
+\caption{Clang fails to vectorize the loop that iterates through
 every element, but writing vector type guarantees vectorization. }
 \label{vec-fma-int}
 \end{table}
 
 
-% \begin{verbatim}
-% #define size 128
-% #define IntZmmSize 16
-% typedef int intZmm __attribute__((ext_vector_type(IntZmmSize)));
-% void vec_fma(int* src1_ptr, int* src2_ptr, 
-%              int* src3_ptr, int* dst_ptr) {
-%     for (uint32_t i = 0; i < size; i += 1 ){
-%         intZmm src1Vec = *(Zmm *)(src1_ptr + i);
-%         intZmm src2Vec = *(Zmm *)(src2_ptr + i);
-%         intZmm src3Vec = *(Zmm *)(src3_ptr + i);
-%         *(intZmm *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
-%     }
-% }
-% \end{verbatim}
+
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
+    \end{center}
+    \caption{In this benchmark, \dtfloat{} is always faster than \dtint{},
+    because it benefits from fused-multiply-add. }
+    \label{plot_vectorization_method}
+\end{figure}
 
 
 \section{Matrix data structure}
