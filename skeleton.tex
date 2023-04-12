@@ -458,9 +458,13 @@ single instruction.
 
 
 \begin{figure}
+    \begin{center}
+        %\captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/small-val-low-dim.png}
-    \caption{TODO.~\cite{FPL1}}
+    \caption{Linear programming problems for program analysis exhibits unique
+    characteristics of small value size and low dimensionality~\cite{FPL1}.}
     \label{small-val-low-dim}
+    \end{center}
 \end{figure}
 
 
@@ -488,9 +492,14 @@ version is not merged with the upstream for two reasons:
 
 
 \begin{figure}
+    \begin{center}
+        %\captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/transprecision.png}
-    \caption{The The architecture of FPL.}
+    \caption{The The architecture of FPL. The focus of this report is the
+    ``Simplex'' method of the ``Core Algorithms'', since it is the main
+    performance bottleneck.~\cite{FPL2}}
     \label{fig:fpl_arch}
+    \end{center}
 \end{figure}
 
 \section{Modern CPU micro-architecture}
@@ -508,8 +517,7 @@ unpopular ~\cite{linusHopeAvx512Die}, as it did not bring practical performance
 improvements. The primary reason was that it consumed a lot more power than
 usual, causing severe overheating. The micro-architecture Skylake from Intel,
 and its \texttt{AVX-512} enabled counterpart Skylake-X is a classic example.
-Skylake provides 2 256 bits FMA \texttt{AVX-2} execution units
-\footnote{Fused-multiply-add (FMA) execution units are a type of floating point
+Skylake provides 2 256 bits FMA \texttt{AVX-2} execution units\footnote{Fused-multiply-add (FMA) execution units are a type of floating point
 execution units, capable of doing addition, multiplication or both in a single
 instruction. See Section \ref{sec:FMA}.} and Intel provides 2 512-bit
 \texttt{AVX-512} FMA units by fusing the existing \texttt{AVX-2}  units into a
@@ -590,12 +598,12 @@ Substituting the sign, exponent and mantissa into the formula, we get: \\
 
 \begin{figure}
     \begin{center}
-        \captionsetup{justification=centering}
+        %\captionsetup{justification=centering}
         \includegraphics[width=\linewidth]{image/ieee-f32.png}
         \includegraphics[width=\linewidth]{image/ieee-f64.png}
-        \caption{Diagrams of IEEE 754 single (32 bits) and double (64 bits)
-        precision floating point~\cite{ieee754-diagram}. In some literature
-        ``mantissa'' is referred as ``fraction''.}
+        \caption{IEEE 754 specification for single (32 bits) and double (64
+        bits) precision floating point~\cite{ieee754-diagram}. In some
+        literature ``mantissa'' is referred as ``fraction''.}
         \label{fig:ieee-f32}
     \end{center}
 \end{figure}
@@ -658,10 +666,11 @@ in floating points precisely. An examples of such numbers are large powers of 2,
 like \texttt{2\^{}30 = 0x40000000}. Its binary representation in \dtfloat{}
 is:
 \begin{VerbatimCompact}
-Sign     = 0
-Exponent = 10011011
-Mantissa = 0
+Sign     = 0b0        -> 0     
+Exponent = 0b10011011 -> 0b10011011 - 127 = 155 - 127 = 28             
+Mantissa = 0b0        -> 0b1.0 = 1
 \end{VerbatimCompact}
+% -1^0 * 2^28 * 1 = 2^28 
 Despite being greater than the size of
 the mantissa, they are normalized rather then being rounded, and therefore does
 not break the mechanism of representing integer in floating-points.
@@ -751,7 +760,7 @@ consistent results:
 \begin{compactlist}
     \item Set the governor to \texttt{performance}, 
     \item Disable AMD Precision Boost Overdrive (or Intel Turbo Boost), 
-    \item Lock clock frequency at a 5 GHz, or any desired fixed value,
+    \item Lock clock frequency at a 4.5 GHz, or any desired and feasible value,
     \item Make sure heat dissipation is working properly.
 \end{compactlist}
 
@@ -960,7 +969,7 @@ enabled. Starting with an example (Listing \ref{vec-add-float-auto}), the simple
 the third. 
 
 \begin{table}[ht]\captionsetup{name=Listing}
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
     Source code\\
     \midrule
@@ -993,7 +1002,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 \end{tabular}
 \caption{The vectorized and scalar binary are derived by compiling with flags
 \texttt{-O3 -march=native} and \texttt{-O3 -march=native -mno-avx -mno-sse}
-respectively, on a Zen4 computer with \texttt{clang-17}.}
+respectively, on a Zen4 computer with \texttt{clang-15}.}
 \label{vec-add-float-auto}
 \end{table}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
@@ -1034,7 +1043,7 @@ between the vectors to performed element-wise operations. The previous
 \ref{vec-add-float-vecty}:
 
 \begin{table}[ht]\captionsetup{name=Listing}
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
     Source code\\
     \midrule
@@ -1051,8 +1060,8 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 }
 \end{VerbatimCompact}
 \end{tabular}
-\caption{Comparing to Listing \ref{vec-add-float-auto}, it is slightly more
-complicated to code with vector types.}
+\caption{Comparing to the C++ source code in Listing \ref{vec-add-float-auto},
+it is slightly more complicated to code with vector types.}
 \label{vec-add-float-vecty}
 \end{table}
 \subsection{Evaluation}
@@ -1076,9 +1085,9 @@ times and 11 times faster than the automatic vectorization and vectorization
 disabled version respectively.
 
 \begin{table}[H]\captionsetup{name=Listing}
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code for clang automatic vectorization\\
+    Scalar source code to be automatically vectorized by clang\\
     \midrule
     \begin{VerbatimCompact}
 void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
@@ -1143,9 +1152,13 @@ void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2,
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{The key distinction between two vectorization approaches is the
-register types. \texttt{XMM} and \texttt{ZMM} are 128-bit and 512-bit
-registers respectively.}
+\caption{The toy example performs vectorized fused-multiply-add operation on
+every item from 3 input matrices and save the result to the output matrix. The
+internal data structure of \texttt{matrix} is \texttt{std::vector}, and its
+member function \texttt{getItemPointer(r,c)} returns the pointer to the element
+at row \texttt{r} and column \texttt{c}. The key distinction between two
+vectorization approaches are the register types. \texttt{XMM}s are 128-bit
+registers, while \zmm{}s are 512-bit long.}
 \label{table:vec-fma-float}
 \end{table}
 
@@ -1160,21 +1173,24 @@ for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
 \ref{plot_vectorization_method}).
 
 \begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
+    %\captionsetup{justification=centering}
     \begin{center}
     \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
     \end{center}
-    \caption{Source code written with vector type are an order-of-magnitude
-    faster than their automatically vectorized or scalar counterpart. Also,
-    \dtfloat{} is always faster than \dtint{}, because it benefits from
-    fused-multiply-add. }
+    \caption{A benchmark for the element-wise multiply-add toy example on a 16
+        by 16 matrix with different vectorization techniques. The toy example
+        written with vector types are 5 to 10 times faster than their
+        automatically vectorized or scalar counterpart. 
+    % Also, \dtfloat{}
+    % is always faster than \dtint{}, because it benefits from fused-multiply-add.
+    }
     \label{plot_vectorization_method}
 \end{figure}
 
     \begin{table}[H]\captionsetup{name=Listing}
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code for clang automatic vectorization\\
+    Scalar source code to be automatically vectorized by clang\\
     \midrule
     \begin{VerbatimCompact}
 void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2, 
@@ -1210,7 +1226,7 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
 % \begin{table}[H]\captionsetup{name=Listing}
 % \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
 \\
-    Source code written with clang’s vector type\\
+    Vectorized source code using clang's vector type extension\\
     \midrule
     \begin{VerbatimCompact}
 #define IntZmmSize 16
@@ -1241,8 +1257,9 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{Clang fails to vectorize the loop that iterates through
-every element, but writing vector type guarantees vectorization. }
+\caption{Comparing to source code from Listing \ref{table:vec-fma-float}, the
+only change is replacing \dtfloat{} with \dtint{}. Clang fails to vectorize the
+scalar version, but writing vector type guarantees vectorization. }
 \label{vec-fma-int}
 \end{table}
 
@@ -1269,7 +1286,7 @@ arithmetic. The differences between the two patterns are illustrated by a
 example provided in Table \ref{table:nested-flat}. 
 
 \begin{table}[ht]
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{%
     >{\raggedright\arraybackslash}p{2cm}%
     >{\raggedright\arraybackslash}p{6.5cm}%
@@ -1326,8 +1343,9 @@ vector of 16 = {
     \bottomrule
 
 \end{tabular}
-\caption{This is an example of a 4 by 4 matrix, to highlight the differences
-between the two matrix data structures: nested list and flat list. }
+\caption{This is an example of a 4 by 4 matrix structured using nested list and
+flat list, to highlight their differences.
+}
 \label{table:nested-flat}
 \end{table}
 
@@ -1368,12 +1386,17 @@ ignored, \dtint{} and \dtfloat{} costs nearly same amount of time, while
 
 
 \begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
+    %\captionsetup{justification=centering}
     \begin{center}
         \includegraphics[width=\linewidth]{image/bench_datatype.png}
     \end{center}
-    \caption{It is difficult to check overflow for vectorized \dtint{} and
-    \dtlong{}, therefore their runtime are unavailable. }
+    \caption{ A benchmark for toy example on a 16 by 16 matrix of \dtshort{},
+\dtint{}, \dtlong{}, \dtfloat{}, and \dtdouble{}, with overflow checking turned
+on or off. The runtime information for overflow checked \dtint{} and \dtlong{}
+is not available, because it is difficult to implement vectorized overflow
+checker for them. It is discovered that (1) runtime is
+reduced by 50\% as the bit width of data type is cut by half, (2) overflow
+checking for integer is much more expensive then floating points. }
     \label{bench_datatype}
 \end{figure}
 
@@ -1385,10 +1408,11 @@ ignored, \dtint{} and \dtfloat{} costs nearly same amount of time, while
 
 % \hl{TODO: fix Table number}
 \begin{figure}[H]\captionsetup{name=Figure}
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/arch-table.png}
-    \caption{A summary of features provided by the Zen4 micro-architecture for
-    different data types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
+    \caption{A summary of features and resources provided by the Zen4
+    micro-architecture for different data
+    types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
     \label{archtable}
 \end{figure}
 
@@ -1469,17 +1493,17 @@ runtime~\cite{FPL2}.
 \begin{center}
 \begin{table}[ht]
 \centering
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 \begin{tabular}{  c  L{5.5cm} L{5.5cm}  } 
      & Addition & Multiplication \\ 
     \midrule
-        Ignored 
+        Overflow ignored 
     & 
         \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}} 
     &
         \hlc[pink]{\texttt{vpmullw \%zmm1,\%zmm3,\%zmm2}} \\
     \midrule
-        Enabled 
+        Overflow aware 
     &
         \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}}
         \hl{\texttt{vpaddsw \%zmm2,\%zmm4,\%zmm2}}
@@ -1492,11 +1516,11 @@ runtime~\cite{FPL2}.
         \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
         \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}} \\
   \end{tabular}
-\caption{For vectorized \dtshort{}, this table highlights the difference in
-terms of instruction count when overflow checking is enable or disabled.
-\hlc[pink]{Pink} instructions are required in both versions. Overflow information
-are provided by \hl{yellow} and 
-\hlc[cyan!60]{cyan} instructions. }
+\caption{This table highlights the difference in terms of instruction count when
+overflow checking is enable or disabled for vectorized \dtshort{}.
+\hlc[pink]{Pink} instructions are essential components as they compute the
+anticipated arithmetic results, while overflow information are provided by
+\hl{yellow} and \hlc[cyan!60]{cyan} instructions. }
   \label{table:i16-instr}
 \end{table}
 \end{center}
@@ -1541,7 +1565,7 @@ void function() {
 
 In the \texttt{function()} block, first the \texttt{std::signal()} function is
 called to register the signal handler function for the \sigfpe{} interrupt. Next,
-the \texttt{feclearexcept()} function is called to clear any previously set
+the \texttt{feclearexcept} function is called to clear any previously set
 exception flags in the status register. Then, \feinexact{} and \feinvalid{} is
 passed to the \texttt{feenableexcept()} function to enable inexactness and
 invalid exceptions. Once the floating-point exceptions are enabled, some
@@ -1574,9 +1598,9 @@ bool function(matrix & tableau) {
 \end{verbatim}
 
 Instead of registering floating point imprecision as interrupts, it clears the
-floating point status register with \texttt{feclearexcept()} and reads it
+floating point status register with \texttt{feclearexcept} and reads it
 afterwards using the
-\texttt{fetestexcept()} function, to check whether imprecision has ever occurred
+\texttt{fetestexcept} function, to check whether imprecision has ever occurred
 in previous computations. It then returns a boolean value to notify its caller
 whether or not the test for floating-point exceptions is positive, \texttt{true}
 for safe and \texttt{false} for overflown. In case of returning \texttt{false}, 
@@ -1628,12 +1652,15 @@ indicates that it is significantly faster if we remove x87 status register
 related operations. 
 
 \begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
+    %\captionsetup{justification=centering}
     \begin{center}
     \includegraphics[width=\linewidth]{image/bench_fenv.png}
     \end{center}
-    \caption{Performance of the \texttt{fetestexcept()} and \texttt{feclearexcept()}
-    function from \texttt{cfenv} library. \hl{TODO:}}
+    \caption{A benchmark for the floating point status register reading and
+resetting functions from \texttt{cfenv} library and their modified versions that
+only operates on either the x87 or the \mxcsr{} status register. Excluding x87
+related operations makes both \texttt{fetestexcept} \texttt{feclearexcept}
+faster.}
     \label{plot_fenv}
 \end{figure}
 \normalsize
@@ -1771,19 +1798,39 @@ be indexed by incrementing the address.
 
 \section{Vector size specialization}
 
-A \ymm{} register can pack 8 \dtfloat{}s, and a \zmm{} register can pack 16
-\dtfloat{}s (Figure \ref{archtable}). Since most of the input matrices have less
-than 20 columns (\ref{sec:presburger}), representing a row with 2 \zmm{} vectors
-introduces padding waste of at least 12 \dtfloat{}s, but using 3 \ymm{}
-registers for a row reduces the minimal padding size to 4 \dtfloat{}s. 
+Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
+columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. A
+\ymm{} register can pack 8 \dtfloat{}s, and a \zmm{} register can pack 16
+\dtfloat{}s (Figure \ref{archtable}). When padding each row of the matrix to 32
+columns using 2 \zmm{} registers, at least 12 \dtfloat{}s are wasted.
+Alternatively, the rows can be padded to 24 columns using 3 \ymm{} registers,
+and reducing reduces the minimal padding size to 4 \dtfloat{}s.
 
-To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
-is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
-represent a row. There are 16 combinations in total:
+Since \ymm{} registers have double amount of execution units than \zmm{}
+registers, while there will be only 50\% more instruction count, specialize the
+most of the cases of less than 24 columns with 3 \ymm{} registers is expected to
+be faster than a more genetic implementation of 32 columns and 2 \zmm{}
+registers.
+
+% to represent 24 columns 
+% for , the performance of 
+
+% Thus
+% the column size of a matrix is very likely to be between 16 and 24, and the 
+% perform of \pivot{} implementation padded to 24 columns is critical. 
+
+% Since most of the input matrices have less
+% than 20 columns (\ref{sec:presburger}), representing a row with 2 \zmm{} vectors
+% introduces padding waste of at least 12 \dtfloat{}s, but using 3 \ymm{}
+% registers for a row reduces the minimal padding size to 4 \dtfloat{}s. 
+
+% To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
+% is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
+% represent a row. There are 16 combinations in total:
 \vspace*{-4mm}
 \begin{table}[H]
 \centering
-\captionsetup{justification=centering}
+%\captionsetup{justification=centering}
 % \begin{tabular}{lll}
     %    & \ymm{} register count & \zmm{} register count \\
     % Column $\leq$ 8  & 1   & 1   \\
@@ -1820,17 +1867,17 @@ represent a row. There are 16 combinations in total:
 
 Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
 columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. Thus
-the number of columns of a matrix is very likely to be between 16 and 24, and the 
-perform 
+the column size of a matrix is very likely to be between 16 and 24, and the 
+perform of \pivot{} implementation padded to 24 columns is critical. 
+
+With \dtfloat{}, using 3 \ymm{} instead of 2 \zmm{} 
 
 % unfortunately \dtfloat{} does not provide a performance advantage over \dtshort{}.
-
-
-    % Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
-    % Nevertheless, both of them significantly outperform the upstream scalar
-    % implementation, which renders the 6 ns gap trivial. 
-    % Additionally, \dtfloat{} offers substantial compatibility advantage
-    % over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
+% Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
+% Nevertheless, both of them significantly outperform the upstream scalar
+% implementation, which renders the 6 ns gap trivial. 
+% Additionally, \dtfloat{} offers substantial compatibility advantage
+% over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
 
 
 \chapter{Conclusion and Future work}
