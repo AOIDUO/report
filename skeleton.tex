@@ -346,7 +346,6 @@ the problem in a matrix.
 
 https://people.richland.edu/james/ictcm/2006/simplex.html
 
-\hl{TODO: i am not sure how correct it is}
 
 The simplex method is an iterative approach that moves from one vertex of the
 feasible solution space to another, always improving the objective function 
@@ -967,6 +966,16 @@ complicated to code with vector types.}
 \label{vec-add-float-vecty}
 \end{table}
 \subsection{Evaluation}
+
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
+    \end{center}
+    \caption{www}
+    \label{plot_vectorization_method}
+\end{figure}
+
 \label{sec:vectorization-method-eval}
 When comparing the performance of code written with and without the vector type
 and examining their assembly, it has been discovered that the the automatic
@@ -984,6 +993,7 @@ instructions of 128-bit width, but when vector size is constrained to 512-bit
 width by defining a vector type, more optimal binary can be generated. Benchmark
 indicates that the 512-bit vector width version is xx\% faster.  
 \hl{TODO: make plot and determine this number}
+
 
 
 % 80e4: c5 fa 10 04 b2       	vmovss (%rdx,%rsi,4),%xmm0
@@ -1408,9 +1418,14 @@ that will hold the result of the addition or multiplication. The return value of
 these functions is a boolean that indicates whether an overflow occurred during
 the operation.
 \subsubsection{Evaluation}
-\hl{TODO: I have not done this benchmark before}
-Compare how fast is the following:
-\small
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/bench_datatype_int.png}
+    \end{center}
+    \caption{www}
+    \label{bench_datatype_int}
+\end{figure}
 
 \begin{compactlist}
     \item overflow-checked, vectorized, int16
@@ -1524,24 +1539,21 @@ registers available. There could be even 32 \xmm{} registers if such extension i
 implemented in the micro-architecture~\cite{x87-bad}. 
 
 
-The benchmark, as illustrated in Figure \ref{TODO}, evaluates the performance of
-\texttt{fenv} functions alongside their respective revised versions. The
-modifications involves restricting operations solely
-to the manipulation of either the x87 status register or the \mxcsr{} register. 
-It indicates that it is significantly faster if we remove x87 status register
+The benchmark, as illustrated in Figure \ref{plot_fenv}, evaluates the
+performance of \texttt{fenv} functions alongside their respective revised
+versions. The modifications involves restricting operations solely to the
+manipulation of either the x87 status register or the \mxcsr{} register. It
+indicates that it is significantly faster if we remove x87 status register
 related operations. 
 
-\hl{TODO: plot this}
-\small
-\begin{compactlist}
-\item fetestexcept                           8.15 ns
-\item fetestexcept\_x87                       4.33 ns
-\item fetestexcept\_mxcsr                     4.55 ns
-\item feclearexcept                          49.3 ns
-\item feclearexcept\_local\_x87                45.5 ns
-\item feclearexcept\_mxcsr                    9.42 ns
-% \item fetestexcept\_feclearexcept\_mxcsr       13.8 ns
-\end{compactlist}
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/bench_fenv.png}
+    \end{center}
+    \caption{www}
+    \label{plot_fenv}
+\end{figure}
 \normalsize
 
 \subsection{Comparing \dtshort{} and \dtfloat{}}
