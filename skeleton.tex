@@ -324,6 +324,7 @@ case~\cite{FPL1}, it is discovered that:
 
 \chapter{Background}
 \section{Linear Programming and Simplex Algorithm}
+\label{simplex}
 Linear programming is a mathematical optimization technique used to model and
 find the best possible solution to a problem, given a set of constraints and an
 objective function to maximize or minimize. Its canonical form consists of a
@@ -350,7 +351,7 @@ where \begin{math}x_1 \,...\, x_n\end{math} are the variables,
 \begin{math}c_1 \,...\, c_n\end{math} are the coefficients of the objective function, 
 and non-negative \begin{math}a_{11}, a_{12} \,...\, a_{21} \,...\ a_{m1} \,...\, a_{mn}\end{math}
 together with \begin{math}b_1 \,...\, b_m\end{math} encodes the constraints of
-the problem in a matrix \cite{simplex-example}. 
+the problem in a matrix \cite{FPL1}. 
 
 % For example, the constraints 
 % \begin{math}
@@ -368,26 +369,79 @@ the problem in a matrix \cite{simplex-example}.
 % -7x_1 + 4x_2 + 5 \geq 0
 % \end{math}
     
-To find \begin{math}
-x_1 \, ... \, x_n\end{math} that maximizes the objective function while 
-satisfying constraints at the same time, the matrix is transformed iteratively, 
-until the solution appears or the solution is not feasible. The transformations
-are called ``pivot'', and 
+The simplex algorithm is an iterative approach to find \begin{math} x_1 \, ...
+\, x_n\end{math} that maximizes the objective function while satisfying
+constraints at the same time. The matrix goes through a sequence of
+transformations, until the solution appears or the solution is not feasible. The
+transformations are called ``pivot'', and it solves the linear equation at pivot
+row for the variable at pivot column: 
+\vspace*{-4mm}
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{llll}
+Pivot item           & $\alpha$ & $\rightarrow$ & $\frac{1}{\alpha}$            \\
+Rest of the pivot row    & $\beta$  & $\rightarrow$ & $-\frac{\beta}{\alpha}$            \\
+Rest of the pivot column& $\gamma$ & $\rightarrow$ & $\frac{\gamma}{\alpha}$            \\
+Other entries         & $\delta$ & $\rightarrow$ & $\delta - \frac{\beta\gamma}{\alpha}$  
+\end{tabular}
+\end{center}
+\end{table}
+\vspace*{-8mm}
 
+The pivot transformation involves division, and thereby produces rational
+numbers. Rationals of base 10 cannot be expressed as binary floating points
+precisely due to inaccuracy caused by potential rounding. In addition, division
+is an expensive operation comparing to addition or multiplication. This issue
+can be addressed through demoralizing each row by multiplying each row with
+their common denominator~\cite{FPL1}: 
+\vspace*{-4mm}
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{llll}
+Pivot item           & $\alpha$ & = & $\frac{\alpha_n}{d_p}$            \\
+Rest of the pivot row    & $\beta$  & = & $\frac{\beta_n}{d_p}$            \\
+Rest of the pivot column& $\gamma$ & = & $\frac{\gamma_n}{d_i}$            \\
+Other entries         & $\delta$ & = & $\frac{\delta_n}{d_i}$  
+\end{tabular}
+\end{center}
+\end{table}
+\vspace*{-8mm}
+where $d_p$ is the denominator of the pivot row, $d_i$ is the denominator of the
+$i^{th}$ row. After demoralization $\alpha_n$, $\beta_n$, $\gamma_n$, and
+$\delta_n$, becomes $\alpha$, $\beta$, $\gamma$, and $\delta$.
 
+Substituting into the processing formula, the pivot row becomes:
+\vspace*{-4mm}
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{llll}
+Pivot item           & $\frac{\alpha_n}{d_p}$ & $\rightarrow$ & $\frac{d_p}{\alpha_n}$       \\
+Rest of the pivot row    & $\frac{\beta_n}{d_p}$  & $\rightarrow$ & -$\frac{\beta_n}{\alpha_n}$  
+\end{tabular}
+\end{center}
+\end{table}
+\vspace*{-8mm}
+This transformation effectively becomes swapping $\alpha_n$ with $d_p$ and
+negating every non-pivot-column item. 
 
-The simplex method is an iterative approach that moves from one vertex of the
-feasible solution space to another, always improving the objective function 
-until the optimal solution is reached. The algorithm involves two main steps: 
-pivot operations and determining the entering and leaving variables.
-
-
-
-
-
-% The Simplex method is a widely-used
-% algorithm for solving linear programming problems.
-
+Likewise, the non-pivot rows are transformed as the following:
+\vspace*{-4mm}
+\begin{table}[H]
+\begin{center}
+\begin{tabular}{llll}
+Rest of the pivot column& $\frac{\gamma_n}{d_i}$ & $\rightarrow$ & $\frac{\gamma_nd_p}{a_nd_i}$            \\
+Other entries         & $\frac{\delta_n}{d_i}$    & $\rightarrow$ & $\frac{\delta_na_n-\beta_n\gamma_n}{a_nd_i}$  
+\end{tabular}
+\end{center}
+\end{table}
+\vspace*{-8mm}
+and can be implemented in these procedures: 
+\vspace*{-2.0mm}
+\begin{compactlist}
+    \item Update row denominator: $d_i' = d_ia_n$, 
+    \item Multiply non-pivot-column items by $a_n$,
+    \item Subtract $\beta_n\gamma_n$ to every non-pivot row.
+\end{compactlist}
 
 \section{Presburger library}
 \label{sec:presburger}
@@ -409,20 +463,20 @@ required to have arbitrary precision arithmetic \texttt{LargeInteger} as a
 backup. Also, the maximum observed column count is 28 and there is not a certain
 maximum column count as well. 
 
-Therefore the FPL paper presents a 3-way transprecision implementation for the
-Presburger library, from row-wise vectorized \dtshort{} to element-wise
-scalar \dtlong{} and element-wise scalar \texttt{LargeInteger}, as
-illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the MLIR upstream
-only presents a 2-layer transprecision, consisting of element-wise scalar
-operation using \dtlong{} and \texttt{LargeInteger}. The
-\dtshort{} version is not merged with the upstream for two reasons: 
+The FPL paper presents a 3-way transprecision implementation for the Presburger
+library's simplex solver using the algorithm described in Section \ref{simplex}.
+It starts from row-wise vectorized \dtshort{}, and will switch to  element-wise
+scalar \dtlong{} or element-wise scalar \texttt{LargeInteger} in case of
+overflow, as illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the
+MLIR upstream only presents a 2-layer transprecision, consisting of element-wise
+scalar operation using \dtlong{} and \texttt{LargeInteger}. The \dtshort{}
+version is not merged with the upstream for two reasons: 
 \begin{compactlist} 
     \item \dtshort{} vectors require \texttt{AVX-512} ISA extension, but hardware
     support is rare (Section \ref{sec:avx512}). 
-    \item Despite the \dtshort{} version is fast \hl{TODO: find how much
-    faster in FPL paper}, overflow checking overhead is ??\%\hl{TODO: find how
-    much is overhead}~\cite{FPL2}. Using floating points could significantly
-    reduce this overhead and potentially be faster (Section \ref{sec:i23}).  
+    \item Despite the \dtshort{} version is fast, overflow checking overhead is
+    65\%~\cite{FPL2}. Using floating points could significantly reduce this
+    overhead and potentially be faster (Section \ref{sec:i23}).  
 \end{compactlist}
 
 
@@ -610,7 +664,7 @@ for fast integer arithmetic, for example, modular exponentiation
 \cite{intfpu-modexp} and RSA algorithms~\cite{intfpu-rsa}, because often the
 architecture of GPU prioritizes floating points performance rather than
 integers. 
-\hl{TODO: place this paragraph here?}
+% \hl{TODO: place this paragraph here?}
 
 
 \begin{figure}
@@ -1442,7 +1496,7 @@ are provided by \hl{yellow} and
 \subsubsection{Implementation of scalar \dtint{} and \dtlong{}
 overflow checking} 
 
-\hl{Not sure if this section is necessary or not?}
+\hl{TODO:Not sure if this section is necessary or not?}
 
 Clang's language extension provides functions to perform overflow-checked
 integer arithmetics: 
@@ -1718,10 +1772,8 @@ registers for a row reduces the minimal padding size to 4 \dtfloat{}s.
 
 To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
 is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
-represent a row. The 8 combinations are listed in Table
-\ref{table:specialization} and their benchmarks are plotted in Figure
-\ref{fig:specialization}.
-
+represent a row, 16 combinations in total:
+\vspace*{-4mm}
 \begin{table}[H]
 \centering
 \captionsetup{justification=centering}
@@ -1733,18 +1785,23 @@ represent a row. The 8 combinations are listed in Table
     % Column $\leq$ 32 & 4   & 2  
     % \end{tabular}
 \begin{tabular}{llll}
-    Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
-    Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
-    Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  
+    \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
+    \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
+    \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
+    \hline
+    \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+    \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
+    \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
+    \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
     \end{tabular}
-\caption{todo}
-\label{table:specialization}
 \end{table}
+\vspace*{-8mm}
 
 \begin{figure}[H]
     \begin{center}
-        \includegraphics[width=50mm]{image/turtle.png}
+        \includegraphics[width=\linewidth]{image/specialize-i16-f32.png}
+        % \includegraphics[width=50mm]{image/turtle.png}
     \end{center}
     \caption{\hl{TODO: write caption}}
     \label{fig:specialization}
