@@ -1360,8 +1360,10 @@ function can be optimized to only compute index once (See Section
 16 rows, the nested vector matrix is about 8 ns faster than the flat matrix.
 
 \begin{figure}
-    \includegraphics[width=\linewidth]{image/nested-flat.jpg}
-    \caption{\hl{TODO: write caption}}
+    \includegraphics[width=\linewidth]{image/bench_nested_flat.png}
+\caption{On a 16-row toy example doing \dtfloat{} fused-multiply-add, selecting
+a flat list as the data structure of matrix is consistently faster than the
+nested list implementation.  }
     \label{fig:nested-flat}
 \end{figure}
 
@@ -1804,7 +1806,7 @@ columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. A
 \dtfloat{}s (Figure \ref{archtable}). When padding each row of the matrix to 32
 columns using 2 \zmm{} registers, at least 12 \dtfloat{}s are wasted.
 Alternatively, the rows can be padded to 24 columns using 3 \ymm{} registers,
-and reducing reduces the minimal padding size to 4 \dtfloat{}s.
+and reducing the minimal padding size to 4 \dtfloat{}s.
 
 Since \ymm{} registers have double amount of execution units than \zmm{}
 registers, while there will be only 50\% more instruction count, specialize the
@@ -1827,30 +1829,30 @@ registers.
 % To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
 % is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
 % represent a row. There are 16 combinations in total:
-\vspace*{-4mm}
-\begin{table}[H]
-\centering
-%\captionsetup{justification=centering}
-% \begin{tabular}{lll}
-    %    & \ymm{} register count & \zmm{} register count \\
-    % Column $\leq$ 8  & 1   & 1   \\
-    % Column $\leq$ 16 & 2   & 1   \\
-    % Column $\leq$ 24 & 3   & 2   \\
-    % Column $\leq$ 32 & 4   & 2  
-    % \end{tabular}
-\begin{tabular}{lllll}
-    1. & \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    2. & \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
-    3. & \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
-    4. & \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
-    \hline
-    5. & \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    6. & \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
-    7. & \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
-    8. & \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
-    \end{tabular}
-\end{table}
-\vspace*{-8mm}
+% \vspace*{-4mm}
+% \begin{table}[H]
+% \centering
+% %\captionsetup{justification=centering}
+% % \begin{tabular}{lll}
+%     %    & \ymm{} register count & \zmm{} register count \\
+%     % Column $\leq$ 8  & 1   & 1   \\
+%     % Column $\leq$ 16 & 2   & 1   \\
+%     % Column $\leq$ 24 & 3   & 2   \\
+%     % Column $\leq$ 32 & 4   & 2  
+%     % \end{tabular}
+% \begin{tabular}{lllll}
+%     1. & \dtfloat{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+%     2. & \dtfloat{}, Column $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
+%     3. & \dtfloat{}, Column $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
+%     4. & \dtfloat{}, Column $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
+%     \hline
+%     5. & \dtshort{}, Column $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
+%     6. & \dtshort{}, Column $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
+%     7. & \dtshort{}, Column $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
+%     8. & \dtshort{}, Column $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
+%     \end{tabular}
+% \end{table}
+% \vspace*{-8mm}
 
 \begin{figure}[H]
     \begin{center}
@@ -1865,12 +1867,12 @@ registers.
 
 % It is found that for matrices with small column sizes that fits 
 
-Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
-columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. Thus
-the column size of a matrix is very likely to be between 16 and 24, and the 
-perform of \pivot{} implementation padded to 24 columns is critical. 
+% Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
+% columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. Thus
+% the column size of a matrix is very likely to be between 16 and 24, and the 
+% perform of \pivot{} implementation padded to 24 columns is critical. 
 
-With \dtfloat{}, using 3 \ymm{} instead of 2 \zmm{} 
+% With \dtfloat{}, using 3 \ymm{} instead of 2 \zmm{} 
 
 % unfortunately \dtfloat{} does not provide a performance advantage over \dtshort{}.
 % Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
