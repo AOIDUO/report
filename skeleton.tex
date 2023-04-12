@@ -1,6 +1,6 @@
-% UG project example file, February 2022
-% Do not change the first two lines of code, except you may delete "logo," if causing problems.
-% Understand any problems and seek approval before assuming it's ok to remove ugcheck.
+% UG project example file, February 2022 Do not change the first two lines of
+% code, except you may delete "logo," if causing problems. Understand any
+% problems and seek approval before assuming it's ok to remove ugcheck.
 \documentclass[logo,bsc,singlespacing,parskip]{infthesis}
 \usepackage{ugcheck}
 \newcommand{\todo}{\textbf{?} }
@@ -125,14 +125,14 @@ datatype, a 23-bit integer datatype created from the 23-bit mantissa of a
 \texttt{int23\_t} overflow can be captured as floating point imprecision by a
 status register, and the cost of reading the status register can be as low as 1
 ns, making overflow awareness almost free.  
-On the selected 30-row by 16-column representative input matrix, the runtime of
-is reduced from 550 ns to 25 ns, achieving 22 times speedup.
+On a selected 30-row by 20-column representative input matrix, the runtime of
+is reduced from 550 ns to 26 ns, achieving 20 times speedup.
 
-\hl{TODO:Question: mention int16 here?}
+% \hl{TODO:Question: mention int16 here?}
 
-\hl{TODO:Question: 16-column is not representative!}
+% \hl{TODO:Question: 16-column is not representative!}
 
-\hl{Reminder: we don't use int16 for (1) bad compatibility (2) it is not significanlty faster than float}
+% \hl{Reminder: we don't use int16 for (1) bad compatibility (2) it is not significanlty faster than float}
 
 }
 
@@ -229,20 +229,19 @@ consider constructing a new \texttt{pivot} algorithm that satisfies the
 following conditions:
 \begin{enumerate}
 
-\item Utilize SIMD: preliminary benchmarks (Section
-\ref{sec:vectorization-method-eval}) indicate 8x \hl{TODO: verify this number}
-performance improvement on a simple vector element-wise add example. 
+\item Utilize SIMD: preliminary benchmark (Section
+\ref{sec:vectorization-method-eval}) indicates at least 10 times
+performance improvement. 
 
 \item Use small bit width for every element: reducing bit width by half doubles the
 amount of numbers packed into a single vector register, and essentially reduces
 the instruction count by half (See Table \ref{archtable}). 
 
 \item Fast overflow checking: for integers, overflow has to be checked manually
-and this introduces 60\%  \hl{(TODO: verify this number?)} overhead, as
-benchmarks in the Section \ref{sec:i16-overflow-checking} shown. This is because
-the x86 architecture does not provide status registers to indicate integer
-overflown. However, there is one for floating points, making floating points
-overflow detection almost free. 
+and this introduces at least 65\% overhead towards total runtime (Section
+\ref{sec:i16-overflow-checking}). This is because the x86 architecture does not
+provide status registers to indicate integer overflown. However, there is one
+for floating points, making floating points overflow detection almost free. 
 
 \end{enumerate}
 
@@ -251,7 +250,7 @@ Previously there was an attempt to vectorize \texttt{pivot} that utilizes
 \dtshort{} and targets matrices with 32 columns or less~\cite{FPL2}. This
 approach offers the advantage of being able to pack a row of 32 elements into a
 single \texttt{AVX-512} register and addresses issues 1 and 2. However, overflow
-is still checked manually, causing 4x or 5x more instruction count (Section
+is still checked manually, causing 4 times more instruction count (Section
 \ref{sec:i16-overflow-checking}). Additionally, this approach introduces a new
 disadvantage, \texttt{AVX-512} extensions are required for the support for
 vectorized \dtshort{}, this is very rare among CPU manufactured in the last
@@ -271,16 +270,16 @@ could still potentially be faster, because overflow checking overhead can be
 significantly reduced. With floating points, the cost of overflow checking is
 the time spent on resetting the status register once at the beginning of a
 sequence of calls to \pivot{}, plus reading it in each \pivot{} call. Even
-though reading the register and resetting may take 4.5 ns and 9.4 ns
-respectively (\hl{TODO: some figure}), the effective total overhead is as low as
-1 ns. The average cost of resetting per \pivot{} can be treated as negligible,
-while the superscalar and out-of-order execution pipeline hides the latency of
-reading the status register with pending memory operations. Moreover, floating
-points offer better compatibility with old computers than \dtshort{}. Vector
-\dtfloat{} or \dtdouble{} code can be executed on CPUs with \texttt{AVX-2}, the
-predecessor of \texttt{AVX-512}. Almost every x86 CPU from the last decade
-supports this extension. It can also be adapted to fit even older
-\texttt{AVX-128} and \texttt{SSE} CPUs with minimal change in source code.
+though reading the register takes 5 ns and resetting it costs 10.5 ns
+(Figure \ref{plot_fenv}), the effective total overhead can be less than 1 ns.
+The average cost of resetting per \pivot{} can be treated as negligible, while
+the superscalar and out-of-order execution pipeline hides the latency of reading
+the status register with pending memory operations. Moreover, floating points
+offer better compatibility with old computers than \dtshort{}. Vector \dtfloat{}
+or \dtdouble{} code can be executed on CPUs with \texttt{AVX-2}, the predecessor
+of \texttt{AVX-512}. Almost every x86 CPU from the last decade supports this
+extension. It can also be adapted to fit even older \texttt{AVX-128} and
+\texttt{SSE} CPUs with minimal change in source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
 especially \texttt{Zen4}, through a matrix element-wise fused-multiply-add toy
@@ -303,12 +302,23 @@ assembly, including:
 \begin{compactlist} 
     \item Implementing matrix-wise transprecision computing 
     \item Double buffering
-    \item Alignment
+    \item Aligning the matrix to the size of vector registers
     \item Reducing number of matrix index computation
-    \item Vector size specialization
+    \item Specialization for different row sizes
 \end{compactlist}
 
-\hl{TODO: Update here with final performance figure}
+After applying these optimizations, a benchmark is setup targeting a selected
+30-row matrix. The column of the matrix can be configured to be 8, 16, 24 or 32.
+In the case of 24 columns, which is considered to be the most representative
+case~\cite{FPL1}, it is discovered that: 
+\begin{enumerate}
+    \item \dtfloat{} does not provide a performance advantage over \dtshort{}.
+    Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
+    Nevertheless, both of them significantly outperform the upstream scalar
+    implementation, which renders the 6 ns gap trivial. 
+    \item Additionally, \dtfloat{} offers substantial compatibility advantage
+    over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
+\end{enumerate}
 
 
 
@@ -927,9 +937,9 @@ respectively, on a Zen4 computer with \texttt{clang-17}.}
 \end{table}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
-After compiling on a \texttt{AVX-512} enabled computer and disassembling the binary, it
-is observed that clang automatically packs 16 \dtfloat{} (512 bits) as a
-operand of the \texttt{VADDPS} instruction. 
+After compiling on a \texttt{AVX-512} enabled computer and disassembling the
+binary, it is observed that clang automatically packs 16 \dtfloat{} (512 bits)
+as a operand of the \texttt{vaddps} instruction. 
 
 Alternatively, vectorization could be disabled by adding the \texttt{-mno-avx
 -mno-sse} flags on top of \texttt{-O3 -march=native}. These two sets of flags
@@ -996,15 +1006,13 @@ width.
 
 Consider the \texttt{vec\_fma} function in Listing \ref{table:vec-fma-float}, a
 slightly more complicated version of the previous \texttt{vec\_add} example,
-where an additional array is introduced and the element-wise operation is
-changed from addition to FMA. The disassembly reveals that clang decides to use
-FMA vector instructions of 128-bit width, but when vector size is constrained to
-a bigger width by defining a vector type, more optimal binary can be generated.
-Benchmark (Figure \ref{plot_vectorization_method}) shows that the vector type
-version is 6 times and 11 times faster than the automatic vectorization and
-vectorization disabled version respectively, but automatic vectorization only
-provides less than 2x performance boost from the scalar version. 
-
+where there are 3 input matrices and the element-wise operation is changed from
+addition to FMA. The disassembly reveals that clang decides to use FMA vector
+instructions of 128-bit width, but when vector size is constrained to a bigger
+width by defining a vector type, more optimal binary can be generated. Benchmark
+(Figure \ref{plot_vectorization_method}) shows that the vector type version is 6
+times and 11 times faster than the automatic vectorization and vectorization
+disabled version respectively.
 
 \begin{table}[H]\captionsetup{name=Listing}
 \captionsetup{justification=centering}
@@ -1012,10 +1020,15 @@ provides less than 2x performance boost from the scalar version.
     Source code for clang automatic vectorization\\
     \midrule
     \begin{VerbatimCompact}
-void vec_fma(float* src1_ptr, float* src2_ptr,
-             float* src3_ptr, float* dst_ptr) {
-    for (uint32_t i = 0; i < size; i += 1 ){
-        dst_ptr[i] = src1_ptr[i] * src2_ptr[i] + src3_ptr[i];
+void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
+             matrix<float> & mat_src3, matrix<float> & mat_dst) {
+    for (int i = 0; i < row; i += 1) {
+        for (int j = 0; j < col; j += 1) {
+            float src1 = mat_src1.get(i,j);
+            float src2 = mat_src2.get(i,j);
+            float src3 = mat_src3.get(i,j);
+            mat_dst.set(i,j,  (src1 * src2) + src3);
+        }
     }
 }
     \end{VerbatimCompact}
@@ -1041,12 +1054,15 @@ void vec_fma(float* src1_ptr, float* src2_ptr,
     Source code written with clang's vector type\\
     \midrule
     \begin{VerbatimCompact}
-#define size 128
 #define FloatZmmSize 16
 typedef float floatZmm __attribute__((ext_vector_type(FloatZmmSize)));
-void vec_fma(float* src1_ptr, float* src2_ptr,
-             float* src3_ptr, float* dst_ptr) {
-    for (uint32_t i = 0; i < size; i += 1 ){
+void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
+             matrix<float> & mat_src3, matrix<float> & mat_dst) {
+    float * src1_ptr = (float *) mat_src1.getItemPointer(0,0);
+    float * src2_ptr = (float *) mat_src2.getItemPointer(0,0);
+    float * src3_ptr = (float *) mat_src3.getItemPointer(0,0);
+    float * dst_ptr  = (float *) mat_dst.getItemPointer(0,0);
+    for (uint32_t i = 0; i < row * col; i += FloatZmmSize){
         floatZmm src1Vec = *(floatZmm *)(src1_ptr + i);
         floatZmm src2Vec = *(floatZmm *)(src2_ptr + i);
         floatZmm src3Vec = *(floatZmm *)(src3_ptr + i);
@@ -1079,20 +1095,36 @@ performance. In the \texttt{vec\_fma} example, by changing the type signature
 from \dtfloat{} to \texttt{int}, clang decides to dispatch scalar instructions
 for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
 (Listing \ref{vec-fma-int}). Their vectorized equivalency \texttt{vpaddd} and
-\texttt{vpmulld} (Listing \ref{vec-fma-int}) are 15 times more performant (Figure
+\texttt{vpmulld} is 15 times more performant (Figure
 \ref{plot_vectorization_method}).
 
-\begin{table}[H]\captionsetup{name=Listing}
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
+    \end{center}
+    \caption{Source code written with vector type are an order-of-magnitude
+    faster than their automatically vectorized or scalar counterpart. Also,
+    \dtfloat{} is always faster than \dtint{}, because it benefits from
+    fused-multiply-add. }
+    \label{plot_vectorization_method}
+\end{figure}
+
+    \begin{table}[H]\captionsetup{name=Listing}
 \captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
     Source code for clang automatic vectorization\\
     \midrule
     \begin{VerbatimCompact}
-#define size 128
-void vec_fma(int* src1_ptr, int* src2_ptr, 
-             int* src3_ptr, int* dst_ptr) {
-    for (uint32_t i = 0; i < size; i += 1 ){
-        dst_ptr[i] = src1_ptr[i] * src2_ptr[i] + src3_ptr[i];
+void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2, 
+             matrix<int> & mat_src3, matrix<int> & mat_dst) {
+    for (int i = 0; i < row; i += 1) {
+        for (int j = 0; j < col; j += 1) {
+            int src1 = mat_src1.get(i,j);
+            int src2 = mat_src2.get(i,j);
+            int src3 = mat_src3.get(i,j);
+            mat_dst.set(i,j,  (src1 * src2) + src3);
+        }
     }
 }
     \end{VerbatimCompact}
@@ -1120,12 +1152,15 @@ void vec_fma(int* src1_ptr, int* src2_ptr,
     Source code written with clang’s vector type\\
     \midrule
     \begin{VerbatimCompact}
-#define size 128
 #define IntZmmSize 16
 typedef int intZmm __attribute__((ext_vector_type(IntZmmSize)));
-void vec_fma(int* src1_ptr, int* src2_ptr,
-             int* src3_ptr, int* dst_ptr) {
-    for (uint32_t i = 0; i < size; i += 1 ){
+void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2, 
+             matrix<int> & mat_src3, matrix<int> & mat_dst) {
+    int * src1_ptr = (int *) mat_src1.getItemPointer(0,0);
+    int * src2_ptr = (int *) mat_src2.getItemPointer(0,0);
+    int * src3_ptr = (int *) mat_src3.getItemPointer(0,0);
+    int * dst_ptr  = (int *) mat_dst.getItemPointer(0,0);
+    for (uint32_t i = 0; i < row * col; i += IntZmmSize){
         intZmm src1Vec = *(intZmm *)(src1_ptr + i);
         intZmm src2Vec = *(intZmm *)(src2_ptr + i);
         intZmm src3Vec = *(intZmm *)(src3_ptr + i);
@@ -1152,15 +1187,6 @@ every element, but writing vector type guarantees vectorization. }
 
 
 
-\begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
-    \begin{center}
-    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
-    \end{center}
-    \caption{In this benchmark, \dtfloat{} is always faster than \dtint{},
-    because it benefits from fused-multiply-add. }
-    \label{plot_vectorization_method}
-\end{figure}
 
 
 \section{Matrix data structure}
@@ -1255,7 +1281,7 @@ function can be optimized to only compute index once (See Section
 16 rows, the nested vector matrix is about 8 ns faster than the flat matrix.
 
 \begin{figure}
-    \includegraphics[width=\linewidth]{image/nested-flat.jpg}
+    \includegraphics[width=40mm]{image/nested-flat.jpg}
     \caption{\hl{TODO: write caption}}
     \label{fig:nested-flat}
 \end{figure}
@@ -1268,29 +1294,40 @@ function can be optimized to only compute index once (See Section
 \label{sec:width} 
 Since the numbers stored in the matrix are almost always less than 10 bits,
 using shorter data types can be more advantageous than longer ones because they
-allow more numbers to be packed into a single vector register (Figure 
+allow more numbers to be packed into a single vector register (Figure
 \ref{archtable}). The number of instructions can be cut by half when data width
 is reduced to half, and less instruction count always leads to less execution
 time. Given that the Zen4 micro-architecture provides approximately same amount
 of execution units for both integers and floating points, it is reasonable to
 estimate that the execution time is inversely proportional to the bit width of
-data type. As confirmed in Plot \ref{fig:col8-col16-col32-i16-i32-f32-f64},
-\dtint{} and \dtfloat{} costs nearly same amount of time, while \dtint{} and \dtdouble{}
-costs double the amount of time than \dtshort{} and \dtfloat{} respectively.
+data type. As confirmed in Figure \ref{bench_datatype}, when overflow is
+ignored, \dtint{} and \dtfloat{} costs nearly same amount of time, while
+\dtint{} and \dtdouble{} costs double the amount of time than \dtshort{} and
+\dtfloat{} respectively.
 
 
-\begin{figure}[H]
-    \includegraphics[width=\linewidth]{image/col8-col16-col32-i16-i32-f32-f64.png}
-    \caption{\hl{TODO: write caption}}
-    \label{fig:col8-col16-col32-i16-i32-f32-f64}
+\begin{figure}[H]\captionsetup{name=Figure}
+    \captionsetup{justification=centering}
+    \begin{center}
+        \includegraphics[width=\linewidth]{image/bench_datatype.png}
+    \end{center}
+    \caption{It is difficult to check overflow for vectorized \dtint{} and
+    \dtlong{}, therefore their runtime are unavailable. }
+    \label{bench_datatype}
 \end{figure}
+
+% \begin{figure}[H]
+%     \includegraphics[width=\linewidth]{image/col8-col16-col32-i16-i32-f32-f64.png}
+%     \caption{\hl{TODO: write caption}}
+%     \label{fig:col8-col16-col32-i16-i32-f32-f64}
+% \end{figure}
 
 % \hl{TODO: fix Table number}
 \begin{figure}[H]\captionsetup{name=Figure}
 \captionsetup{justification=centering}
     \includegraphics[width=\linewidth]{image/arch-table.png}
-    \caption{A summary for features provided by the Zen4 micro-architecture
-    for different data types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
+    \caption{A summary of features provided by the Zen4 micro-architecture for
+    different data types~\cite{Zen4Critique}~\cite{Zen2ChipWiki}.}
     \label{archtable}
 \end{figure}
 
@@ -1363,18 +1400,19 @@ is required, followed with 2 or 3 comparison, shuffling and branch instructions:
 \hlc[cyan!60]{\texttt{vpsraw}}\footnote{Shift packed data right arithmetic},
 \hlc[cyan!60]{\texttt{vpcmpneqw}}\footnote{Compare packed data for equal}
 and 
-By enabling
 \hlc[cyan!60]{\texttt{kord}}\footnote{Bitwise logical OR masks}. 
-overflow checking, it brings  4x or 5x more instruction count and 60\% more
-runtime~\cite{FPL2}. \hl{(TODO: verify this number?)}
+By enabling
+overflow checking, it brings 4 to 5 times more instruction count and 65\% more
+runtime~\cite{FPL2}.
 
 \begin{center}
 \begin{table}[ht]
-
+\centering
+\captionsetup{justification=centering}
 \begin{tabular}{  c  L{5.5cm} L{5.5cm}  } 
      & Addition & Multiplication \\ 
     \midrule
-        Disabled 
+        Ignored 
     & 
         \hlc[pink]{\texttt{vpaddw \%zmm4,\%zmm2,\%zmm3}} 
     &
@@ -1393,12 +1431,19 @@ runtime~\cite{FPL2}. \hl{(TODO: verify this number?)}
         \hlc[cyan!60]{\texttt{vpcmpneqw \%zmm3,\%zmm5,\%k1}}
         \hlc[cyan!60]{\texttt{kord \%k0,\%k1,\%k0}} \\
   \end{tabular}
-  \caption{\hl{(TODO: write caption)}}
+\caption{For vectorized \dtshort{}, this table highlights the difference in
+terms of instruction count when overflow checking is enable or disabled.
+\hlc[pink]{Pink} instructions are required in both versions. Overflow information
+are provided by \hl{yellow} and 
+\hlc[cyan!60]{cyan} instructions. }
   \label{table:i16-instr}
 \end{table}
 \end{center}
 \subsubsection{Implementation of scalar \dtint{} and \dtlong{}
 overflow checking} 
+
+\hl{Not sure if this section is necessary or not?}
+
 Clang's language extension provides functions to perform overflow-checked
 integer arithmetics: 
 \begin{VerbatimCompact}
@@ -1410,25 +1455,7 @@ input operands, and \texttt{sum} or \texttt{prod} is a pointer to the variable
 that will hold the result of the addition or multiplication. The return value of
 these functions is a boolean that indicates whether an overflow occurred during
 the operation.
-\subsubsection{Evaluation}
-\begin{figure}[H]\captionsetup{name=Figure}
-    \captionsetup{justification=centering}
-    \begin{center}
-    \includegraphics[width=\linewidth]{image/bench_datatype_int.png}
-    \end{center}
-    \caption{www}
-    \label{bench_datatype_int}
-\end{figure}
 
-\begin{compactlist}
-    \item overflow-checked, vectorized, int16
-    \item overflow-ignored, vectorized, int16
-    \item overflow-checked, scalar, int32
-    \item overflow-ignored, vectorized, int32
-    \item overflow-checked, scalar, int64
-    \item overflow-ignored, vectorized, int64
-\end{compactlist}
-\normalsize
 
 \subsection{Overflow checking for floating points}
 \label{sec:overflow-float}
@@ -1453,7 +1480,7 @@ void function() {
 
 In the \texttt{function()} block, first the \texttt{std::signal()} function is
 called to register the signal handler function for the \sigfpe{} interrupt. Next,
-the \texttt{std::feclearexcept()} function is called to clear any previously set
+the \texttt{feclearexcept()} function is called to clear any previously set
 exception flags in the status register. Then, \feinexact{} and \feinvalid{} is
 passed to the \texttt{feenableexcept()} function to enable inexactness and
 invalid exceptions. Once the floating-point exceptions are enabled, some
@@ -1486,7 +1513,8 @@ bool function(matrix & tableau) {
 \end{verbatim}
 
 Instead of registering floating point imprecision as interrupts, it clears the
-floating point status register and reads it afterwards using the
+floating point status register with \texttt{feclearexcept()} and reads it
+afterwards using the
 \texttt{fetestexcept()} function, to check whether imprecision has ever occurred
 in previous computations. It then returns a boolean value to notify its caller
 whether or not the test for floating-point exceptions is positive, \texttt{true}
@@ -1526,11 +1554,10 @@ instructions for occasional scalar operations. This is because the \texttt{SSE}
 execution units can handle both single and double precision floating point
 arithmetic natively, whereas the legacy x87 floating-point instructions operates
 on an 80-bit internal format, requiring additional conversions and delay. Using
-SSE instructions reduces register pressure as well. The \texttt{SSE} units can
-leverage 16 \xmm{} registers, but for x87 units there are only 8 floating point
-registers available. There could be even 32 \xmm{} registers if such extension is
-implemented in the micro-architecture~\cite{x87-bad}. 
-
+\texttt{SSE} instructions reduces register pressure as well. The \texttt{SSE}
+units can leverage 16 \xmm{} registers, but for x87 units there are only 8
+floating point registers available. There could be even 32 \xmm{} registers if
+such extension is implemented in the micro-architecture~\cite{x87-bad}. 
 
 The benchmark, as illustrated in Figure \ref{plot_fenv}, evaluates the
 performance of \texttt{fenv} functions alongside their respective revised
@@ -1544,7 +1571,8 @@ related operations.
     \begin{center}
     \includegraphics[width=\linewidth]{image/bench_fenv.png}
     \end{center}
-    \caption{www}
+    \caption{Performance of the \texttt{fetestexcept()} and \texttt{feclearexcept()}
+    function from \texttt{cfenv} library. \hl{TODO:}}
     \label{plot_fenv}
 \end{figure}
 \normalsize
@@ -1558,17 +1586,12 @@ have concluded that \dtshort{} is superior than any other integer data types and
 % even
 % though \dtshort{} is the fastest on this particular matrix size
 
-Benchmark (Figure \ref{fig:i16-f32}) on the toy example reveals that \dtshort{}'s
-spends a considerably higher percentage of runtime on overflow checking,
-compared with the floating point data types. This is consistent with the
-reasoning from previous chapters, where overhead for \dtfloat{} is a one-time
-expense, but for \dtshort{} it is always a portion of the total runtime. 
-
-\begin{figure}
-    \includegraphics[width=\linewidth]{image/i16-f32.png}
-    \caption{\hl{TODO: replot and remove double}}
-    \label{fig:i16-f32}
-\end{figure}
+Benchmark (Figure \ref{bench_datatype}) on the toy example reveals that
+\dtshort{}'s spends a considerably higher percentage of runtime on overflow
+checking, compared with the floating point data types. This is consistent with
+the reasoning from previous chapters, where overhead for \dtfloat{} is a
+one-time expense, but for \dtshort{} it is always a portion of the total
+runtime. 
 
 Note that even though \dtshort is faster than \dtfloat in this benchmark, it is
 not sound to conclude that the \pivot{} function implemented in \dtshort
@@ -1594,11 +1617,9 @@ of the actual \pivot{} function, float may potentially outperform int16.
 % \end{verbatim}
 
 
-\chapter{Pivot}
+\chapter{Implementation and Optimization of \pivot{}}
 
-\section{Implementation and Optimization}
-
-\subsection{Matrix-wise transprecision}
+\section{Matrix-wise transprecision}
 Transprecision techniques can be implemented at different levels of scale, such
 as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
 are implemented using the matrix-wise transprecision style. For \dtfloat{},
@@ -1622,7 +1643,7 @@ operator OR is applied between that overflow checking result register and a
 overflow flag. 
 
 
-\subsection{Double buffering}
+\section{Double buffering}
 
 Double buffering is a powerful technique to address the issue of data pollution
 caused by overflown data. When matrix-wise computing is carried out, a potential
@@ -1649,7 +1670,7 @@ cycles. In comparison, it can do two multiplication or addition of \zmm{}
 vectors every cycle. The discrepancy in throughput between computing and IO
 suggests that memory copy very expensive and inefficient. 
 
-\subsection{Alignment}
+\section{Alignment}
 In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
 assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. 
 \texttt{vmovups} for
@@ -1671,7 +1692,7 @@ To address this issue, an aligned allocator is given to the constructor of
 and issue aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps}
 accordingly. 
 
-\subsection{Reduce number of matrix index computation}
+\section{Reduce number of matrix index computation}
 \label{sec:optmz-get-index}
 
 Section \ref{sec:mat-structure} discussed the benefits of using a single
@@ -1687,7 +1708,7 @@ be indexed by incrementing the address.
 
 
 
-\subsection{Vector size specialization}
+\section{Vector size specialization}
 
 A \ymm{} register can pack 8 \dtfloat{}s, and a \zmm{} register can pack 16
 \dtfloat{}s (Figure \ref{archtable}). Since most of the input matrices have less
