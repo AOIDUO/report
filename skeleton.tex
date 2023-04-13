@@ -1797,7 +1797,7 @@ can be indexed by incrementing the address.
 
 
 \section{Column Size Specialization}
-
+\label{sec:ColumnSizeSpecialization}
 Figure \ref{small-val-low-dim} shows that 95\% of the matrices have less
 than 20 columns while 75\% of the matrices have more than 18
 columns~\cite{FPL1}. Therefore, a matrix of 19 columns is most likely to be encountered. 
@@ -1810,25 +1810,43 @@ registers, reducing the padding waste to 5 \dtfloat{}.
 
 Since \ymm{} registers have double the amount of execution units than \zmm{}
 registers, while there will be only 50\% more instruction count, the 3 \ymm{}
-setup is expected to be faster than the more generic configuration of 32
-columns and 2 \zmm{} registers. The Benchmark illustrated in Figure
-\ref{fig:specialization} confirms the expectation. 
+setup is expected to be faster than the more generic configuration of 32 columns
+and 2 \zmm{} registers. 
 
+
+\section{Evaluation}
 \begin{figure}[H]
     \begin{center}
         \includegraphics[width=\linewidth]{image/specialize-i16-f32-v2.png}
         % \includegraphics[width=50mm]{image/turtle.png}
     \end{center}
-    \caption{All implementations using \zmm{} require padding column size to 32.
+    \caption{ A benchmark of the \pivot{} function.
+    All implementations using \zmm{} require padding column size to 32.
     However, the combination of \dtfloat{} and \ymm{} allows some flexibility
     in padding size. 
     In cases where the column size is less than 24, instead of padding to 32, 
     the column size is padded to 24, and three \ymm{} registers are allocated for each row.
-    This approach has been found to be 15\% faster than its \zmm{} counterpart.}
+    This approach has been found to be 15\% faster than its \zmm{} counterpart.
+    }
     \label{fig:specialization}
 \end{figure}
 
+By integrating the aforementioned optimizations and running a benchmark for the
+\pivot{} function, it is discovered that:
+\begin{enumerate}
+    \item The \dtshort{} approach from FPL~\cite{FPL2} costs 20 ns, this is 6 ns
+    faster than the \dtfloat{} approach proposed by this report. A possible
+    reason is that Zen 4 is more capable of doing arithmetics than memory
+    IO~\cite{Zen4Critique}. The algorithm using \dtfloat{} could be IO-bounded. 
+    \item The benchmark confirms the expectation in Section
+    \ref{sec:ColumnSizeSpecialization}.
+    \item For Zen 4, migrating \texttt{AVX-2} code to \texttt{AVX-512} indeed
+    brings some performance increments. The \pivot{} function using \dtfloat{}
+    and 2 \zmm{} for a row is 1.4 ns faster than the one using 4 \ymm{} for a
+    row. The benchmark confirms the theoretical benefit of AMD's implementation
+    on \texttt{AVX-512} mentioned in Section \ref{sec:avx512}.
 
+\end{enumerate}
 
 % unfortunately \dtfloat{} does not provide a performance advantage over \dtshort{}.
 % Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
