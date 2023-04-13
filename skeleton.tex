@@ -110,9 +110,9 @@ multiplication and addition on each element of an input matrix of low dimension
 and mostly small-value items. MLIR's upstream uses element-wise
 transprecision computing, where the data type of each element starts with 
 \dtlong{}, and will be switched to \texttt{LargeInteger} in case of overflow. 
-This approach cannot be automatically vectorized by compilers,
-and \dtlong{} has a much larger bit width than what is
-typically needed for most of the items in the matrix.
+Compilers cannot automatically vectorize this approach, and
+\dtlong{} has a much larger bit width than what is
+typically needed for most items in the matrix.
 Additionally, extra arithmetics are required to perform overflow checking 
 for integers, resulting in significant overhead.
 These issues can be addressed by taking
@@ -147,28 +147,22 @@ from the Informatics Research Ethics committee.
 
 
 \begin{acknowledgements}
-% First and foremost, I would like to express my deepest gratitude to my
-% supervisor, Tobias Grosser, for his unwavering support, guidance, and
-% encouragement throughout the course of this research. His extensive knowledge,
-% valuable insights, and patience have been instrumental in shaping my academic
-% and personal growth.
+    I would like to express my deepest gratitude to my supervisor, Tobias
+    Grosser, for his invaluable guidance and support throughout this project.
+    His innovative ideas and enthusiasm have inspired me, and it was a great
+    privilege to work under his mentorship. This interesting project would not
+    have been possible without his involvement.
 
-% I am also immensely grateful to Arjun Pitchanathan, a fellow Ph.D. student under
-% the supervision of Tobias Grosser, for his invaluable assistance and
-% collaboration. His expertise, constructive feedback, and willingness to share
-% his knowledge have significantly contributed to the progress and quality of this
-% work.
-
-% Furthermore, I would like to acknowledge the generous contributions from Marisa
-% Kirisame, Emanon, gjz010, and lyzh, whose insightful comments, technical
-% support, and camaraderie have enriched my research experience. Their shared
-% wisdom and passion for the subject matter have made this journey both enjoyable
-% and rewarding.
-
-% Finally, I am thankful to all my friends, colleagues, and family members who
-% have provided me with the emotional support and encouragement needed to complete
-% this paper. Their unwavering belief in my abilities has been a source of
-% strength and motivation throughout this challenging process.
+    I am also grateful to Tobias's Ph.D. students, Arjun Pitchanathan
+    and Sasha Lopoukhine. Arjun's insights and assistance have been instrumental
+    in the progress of this project. I would like to extend special thanks to
+    Sasha for generously granting me access to the powerful 7950x workstation,
+    which has significantly enhanced my research capabilities.
+    
+    Finally I would like to express my heartfelt appreciation to all my friends who have
+    been a constant source of encouragement and motivation. A special mention
+    goes to Emanon42, lyzh, gjz101, and Marisa Kirisame, whose camaraderie and
+    support have truly made this journey enjoyable and memorable.
 
 \end{acknowledgements}
 
@@ -181,9 +175,9 @@ from the Informatics Research Ethics committee.
 \label{sec:introduction}
 
 MLIR, Multi-Level Intermediate Representation, is an infrastructure for building
-reusable and extensible compilers. It aims to reduce fragmentation in domain
-specific languages and heterogeneous hardware~\cite{mlir}. Its Presburger
-library provides polyhedral compilation techniques to make dependence analysis
+reusable and extensible compilers. It aims to reduce fragmentation in domain-specific
+languages and heterogeneous hardware~\cite{mlir}. Its Presburger
+library provides polyhedral compilation techniques for dependence analysis
 and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
 Presburger arithmetics involves determining whether the conjunction of linear
 arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
@@ -194,15 +188,15 @@ The \texttt{pivot} function involves two multiplication and one addition
 operation on every element in a matrix. Notably, the input matrices for this
 library tend to exhibit characteristics of small values and low dimensionality.
 For example, 90\% of test cases work with 16-bit integers that never overflow,
-and 74\% of isl’s runtime is spent on test cases that we can compute using
+and 74\% of the runtime is spent on test cases that we can compute using
 16-bit integers and matrices with at most 32 columns~\cite{FPL2}. These
-properties can be leveraged to take advantage from modern micro-architectural
+properties can be leveraged to utilize modern micro-architectural
 hardware resources, thereby accelerating the process.
 
 Currently, the source code in MLIR upstream adopts a nested for-loop to iterate
-through every element of the matrix in a transprecision manner. Each number in
-the matrix can either be \dtlong{} or \texttt{LargeInteger}. The
-algorithm starts by using \dtlong{}, in case of overflow, it switches to
+through every matrix element in a transprecision manner. Each element in
+the matrix can either be \dtlong{} or \texttt{LargeInteger} and the
+algorithm starts by using \dtlong{}. In case of overflow, it switches to
 the \texttt{LargeInteger} version. This approach is computationally expensive
 and inefficient, for the following reasons: 
 \begin{enumerate}
@@ -210,15 +204,15 @@ and inefficient, for the following reasons:
 \item \dtlong{} has a much larger bit width than what is typically
 needed for most of the elements in the matrix.
 
-\item The compiler is not capable of automatically generating vectorized
-instructions to further optimize the process.
+\item The compiler is not capable of generating vectorized instructions from
+scalar source code.
 
 \item Overflow is checked through additional arithmetic
 operations.
 
 \end{enumerate}
 
-To propose a faster alternative of the \texttt{pivot} function, we could
+To propose a faster alternative to the \texttt{pivot} function, we could
 consider constructing a new \texttt{pivot} algorithm that satisfies the
 following conditions:
 \begin{enumerate}
@@ -228,14 +222,14 @@ following conditions:
 performance improvement. 
 
 \item Use small bit width for every element: reducing the bit width by half
-doubles the amount of numbers packed into a single vector register, and
+doubles the amount of elements packed into a single vector register, and
 essentially reduces the instruction count by half (See Table \ref{archtable}). 
 
-\item Fast overflow checking: for integers, overflow has to be checked manually
-and this introduces at least 65\% overhead towards total runtime (Section
+\item Fast overflow checking: overflow has to be checked manually for integers,
+which introduces at least 65\% overhead toward total runtime (Section
 \ref{sec:i16-overflow-checking}). This is because the x86 architecture does not
-provide status registers to indicate integer overflow. However, there is one
-for floating points, making floating points overflow detection almost free. 
+provide status registers to indicate integer overflow. However, there is one for
+floating points, making floating points overflow detection almost free. 
 
 \end{enumerate}
 
@@ -246,46 +240,47 @@ approach offers the advantage of being able to pack a row of 32 elements into a
 single \texttt{AVX-512} register and addresses issues 1 and 2. However, overflow
 is still checked manually, causing 4 times more instruction count (Section
 \ref{sec:i16-overflow-checking}). Additionally, this approach introduces a new
-disadvantage, \texttt{AVX-512} extensions are required for the support for
-vectorized \dtshort{}, this is very rare among CPUs manufactured in the last
+disadvantage. The \texttt{AVX-512} extension is required for CPUs to support
+vectorized \dtshort{}, and this is very rare among CPUs manufactured in the last
 decade (Section \ref{sec:avx512}). 
 
 An alternative approach is to do 23-bit or 52-bit integer operations using float
-(32-bit floating point) or double (64-bit floating point) respectively. Though
+(32-bit floating point) or double (64-bit floating point), respectively. Though
 floating points are notorious for precision issues, they are reliable when
 representing integers that fit inside their mantissa, 23 bits for float and 52
 bits for double \footnote{ IEEE 754 specification is introduced in Section
 \ref{sec:IEEE754}}. When the result of some integer computation exceeds the bit
-size of the mantissa, floating point imprecision almost always occurs and a
+size of the mantissa, floating point imprecision almost always occurs, and a
 status register will be set automatically (Section \ref{sec:overflow-float}).
 Comparing to \dtshort{}, even though vector size is sacrificed as there does not
 exist support for 16-bit floating point \texttt{half}, using floating points
 could still potentially be faster, because overflow checking overhead can be
-significantly reduced. With floating points, the cost of overflow checking is
-the time spent on resetting the status register once at the beginning of a
-sequence of calls to \pivot{}, plus reading it in each \pivot{} call. Even
-though reading the register takes 5 ns and resetting it costs 10.5 ns
-(Figure \ref{plot_fenv}), the effective total overhead can be less than 1 ns.
-The average cost of resetting per \pivot{} can be treated as negligible, while
-the superscalar and out-of-order execution pipeline hides the latency of reading
-the status register with pending memory operations. Moreover, floating points
-offer better compatibility with old computers than \dtshort{}. Vector \dtfloat{}
-or \dtdouble{} code can be executed on CPUs with \texttt{AVX-2}, the predecessor
-of \texttt{AVX-512}. Almost every x86 CPU from the last decade supports this
-extension. It can also be adapted to fit even older \texttt{AVX-128} and
-\texttt{SSE} CPUs with minimal change in source code.
+significantly reduced. The cost of overflow checking for floating points is the
+time spent on resetting the status register once at the beginning of a sequence
+of calls to \pivot{}~\cite{FPL1}, plus reading it in each \pivot{} call. Even
+though reading the register takes 5 ns and resetting it costs 10.5 ns (Figure
+\ref{plot_fenv}), the effective total overhead can be less than 1 ns. The
+average cost of resetting per \pivot{} can be treated as negligible, while the
+superscalar and out-of-order execution pipeline hides the latency of reading the
+status register. Moreover, floating points offer better compatibility with old
+computers than \dtshort{}. Vector \dtfloat{} or \dtdouble{} code can be executed
+on CPUs with \texttt{AVX-2}, the predecessor of \texttt{AVX-512}. Almost every
+x86 CPU from the last decade supports \texttt{AVX-2}. 
+% It can also be adapted to
+% fit even older \texttt{AVX-128} and \texttt{SSE} CPUs with slight change in the
+% source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
 especially \texttt{Zen 4}, through a matrix element-wise fused-multiply-add toy
 example under the various configurations regarding vectorization methods, matrix
-data structures, element data types and data widths (Section \ref{sec:Toy}). 
+data structures, element data types, and data widths (Section \ref{sec:Toy}). 
 
-It is discovered that optimal performance can be achieved by selecting clang
-builtin vector type as vectorization methods and use a flat list as matrix data
-structure. However, it is quite difficult to decide whether \dtshort{} or
-\dtfloat{} is better, because the former benefits form bigger vector size
-and less instruction count, while the latter has a minimal overhead on overflow
-checking. 
+It is discovered that optimal performance can be achieved by selecting Clang
+vector type extension as the vectorization methods, and using a flat list as the
+matrix data structure. However, it is quite difficult to decide whether
+\dtshort{} or \dtfloat{} is better, because the former benefits from bigger
+vector size and less instruction count, while the latter has a minimal overhead
+on overflow checking. 
 
 Then two detached versions of \texttt{pivot} function from the Presburger
 library are built from the most optimal configurations derived from the toy
@@ -635,7 +630,7 @@ capable to do FMUL, FADD, and FSUB as well:
 This is a useful feature in many numerical computations that involve
 simultaneous multiplication and addition operations, such as dot products and
 matrix multiplications. Since the \pivot{} function performs multiplications and
-additions between the pivot row, some constant value and each row in the matrix,
+additions between the pivot row, some constant value, and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
 
 \subsection{Representing ``\dtfloati{}'' and ``\dtdoublei{}'' Using
@@ -676,7 +671,7 @@ Mantissa = 0b0        -> 0b1.0 = 1
 \end{VerbatimCompact}
 % -1^0 * 2^28 * 1 = 2^28 
 Despite being greater than the size of
-the mantissa, they are normalized rather than being rounded, and therefore does
+the mantissa, they are normalized rather than being rounded and therefore does
 not break the mechanism of representing integers in floating points.
 
 
@@ -779,7 +774,7 @@ micro-architecture codename, \mca{} reports various metrics to indicate how fast
 the given instructions will execute on the specified micro-architecture. It
 first summarizes the instruction per clock (IPC) and throughput of the entire
 instruction block, then gives detailed information about each instruction,
-including number of uOps, latency, throughput, potential load, store and side
+including the number of uOps, latency, throughput, potential load, store, and side
 effects. \mca{} also reports resource pressure in terms of arithmetic units and
 memory load or store units. When the optional \texttt{-timeline} flag is
 prompted, \mca{} illustrates a timeline view of the analyzed code, showing how
@@ -787,15 +782,14 @@ instructions progress through the pipeline stages of the target processor. The
 timeline helps understand the capability of complicated out-of-order superscalar
 architecture. 
 
-An example is provided below. The analysis from \mca{} indicates that a \texttt{znver2}
-(Zen 2) CPU can repeatedly execute a combination of 
-\texttt{vmovaps}\footnote{\texttt{vmovaps} can be either vector float load or 
-store instruction, depending on how operands are structured.}
-and \texttt{vfmadd213ps}\footnote{\texttt{vfmadd213ps} is the instruction for 
-fused-multiply-add.}
-instructions every 1.3 cycle. This translates to 2.74 instructions per cycle. 
-The output from \mca{} is slightly modified and truncated to fit into 
-limited page size. 
+An example is provided below. The analysis from \mca{} indicates that a
+\texttt{znver2} (Zen 2) CPU can repeatedly execute a combination of
+\texttt{vmovaps}\footnote{\texttt{vmovaps} can be either vector float load or
+store instruction, depending on how operands are structured~\cite{instruction}.}
+and \texttt{vfmadd213ps}\footnote{\texttt{vfmadd213ps} is the instruction for
+fused-multiply-add~\cite{instruction}.} instructions every 1.3 cycles. This
+translates to 2.74 instructions per cycle. The output from \mca{} is slightly
+modified and truncated to fit inside the page.
 % $ cat x.s
 % vmovaps (%rdx,%rsi,4),%ymm0
 % vmovaps (%rcx,%rax,4),%ymm1
@@ -917,17 +911,20 @@ Index 0123456789
 % \end{verbatim}
 
 However, when evaluating the identical assembly code on a more advanced
-micro-architecture \texttt{znver3} (Zen 3), \mca{} reveals reduction in IPC and
-throughput. This appears to be contradictory with both theoretical expectations
+micro-architecture \texttt{znver3} (Zen 3), \mca{} reveals a reduction in IPC and
+throughput. This appears to be contradictory to both theoretical expectations
 and actual benchmarks. After submitting an
 \href{https://github.com/llvm/llvm-project/issues/59325}{issue}
 \cite{mca-issue}, llvm maintainers explained that llvm's scheduling information
 are hand-crafted using \exegesis{}, a micro-benchmark tool. The issue was
 subsequently resolved after rerunning \exegesis{} and confirming that
-\texttt{znver3} indeed has higher throughput as expected. 
+\texttt{znver3} indeed has higher throughput than expected. 
 
-\hl{TODO: should I
-write a paragraph to emphacise that \mca{} is unreliable?}
+This issue suggests that \mca{} is not a reliable tool for analyzing machine
+code, but rather a evaluator for Clang's behavior during instruction selection.
+Therefore, this report chooses Google Benchmark as the performance measuring
+tool.
+
 
 \chapter{Experiments with Toy Example}
 \label{sec:Toy}
@@ -941,7 +938,7 @@ do vector add or vector FMA with various setups, including:
     \item Vectorization method 
         \begin{compactlist} 
             \item Clang's automatic vectorization from scalar source code
-            \item Writing source code using clang's vector type extension
+            \item Writing source code using Clang's vector type extension
         \end{compactlist}
     \item Matrix data structure 
         \begin{compactlist} 
@@ -1002,7 +999,7 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
 1215: d9 44 86 08    flds   0x8(%rsi,%rax,4)
     \end{VerbatimCompact}
 \end{tabular}
-\caption{The vectorized and scalar binary are derived by compiling with flags
+\caption{The vectorized binary and scalar binary is derived by compiling with flags
 \texttt{-O3 -march=native} and \texttt{-O3 -march=native -mno-avx -mno-sse}
 respectively, on a Zen 4 computer with \texttt{clang-15}.}
 \label{vec-add-float-auto}
@@ -1010,13 +1007,12 @@ respectively, on a Zen 4 computer with \texttt{clang-15}.}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
 After compiling on a \texttt{AVX-512} enabled computer and disassembling the
-binary, it is observed that clang automatically packs 16 \dtfloat{} (512 bits)
+binary, it is observed that Clang automatically packs 16 \dtfloat{} (512 bits)
 as a operand of the \texttt{vaddps} instruction. 
 
 Alternatively, vectorization could be disabled by adding the \texttt{-mno-avx
 -mno-sse} flags on top of \texttt{-O3 -march=native}. These two sets of flags
-guarantee that the binary are going to be equally optimized, with the only
-difference been whether vector instructions are generated or not. In this case,
+guarantee that the binary is going to be equally optimized, with the only difference being whether vector instructions are generated or not. In this case, 
 scalar instructions \texttt{fadds}, \texttt{fstps} and \texttt{flds} are
 selected.
 
@@ -1024,7 +1020,7 @@ selected.
 \subsection{Clang's Vector Data Type}
 
 Another approach is to write source code with vectorization in mind in the first
-place. Clang provides extension that allows programmers to declare a new type
+place. Clang provides an extension that allows programmers to declare a new type
 that represents a vector of elements of the same data type. The syntax is 
 \begin{VerbatimCompact}[commandchars=\\\{\}]
 typedef \textit{ty} \textit{vec_ty} __attribute__((ext_vector_type(\textit{vec_width}))), 
@@ -1040,7 +1036,7 @@ defines a 512-bit vector type of \texttt{int16x32}, consisting of 32
 
 After defining a vector data type, a vector variable can be created by casting
 from a pointer of the target array. Then arithmetic operators can be applied
-between the vectors to performed element-wise operations. The previous
+between the vectors to perform element-wise operations. The previous
 \texttt{vec\char`_add} example can be rewritten as the code snippet shown in Listing
 \ref{vec-add-float-vecty}:
 
@@ -1069,18 +1065,18 @@ it is slightly more complicated to code with vector types.}
 
 \label{sec:vectorization-method-eval}
 When comparing the performance of code written with and without the vector type
-and examining their assembly, it has been discovered that the the automatic
-vectorization feature in clang can be unpredictable and may lead to undesired
+and examining their assembly, it has been discovered that the automatic
+vectorization feature in Clang can be unpredictable and may lead to undesired
 behaviors. It operates as a black box and may take a lot of effort to understand
-its mechanisms. One of the issues is that clang may select a suboptimal vector
+its mechanisms. One of the issues is that Clang may select a suboptimal vector
 width.
 
 Consider the \texttt{vec\char`_fma} function in Listing \ref{table:vec-fma-float}, a
 slightly more complicated version of the previous \texttt{vec\char`_add} example,
 where there are 3 input matrices and the element-wise operation is changed from
-addition to FMA. The disassembly reveals that clang decides to use FMA vector
+addition to FMA. The disassembly reveals that Clang decides to use the FMA vector
 instructions of 128-bit width, but when vector size is constrained to a bigger
-width by defining a vector type, more optimal binary can be generated. Benchmark
+width by defining a vector type, a more optimal binary can be generated. Benchmark
 (Figure \ref{plot_vectorization_method}) shows that the vector type version is 6
 times and 11 times faster than the automatic vectorization and vectorization
 disabled version respectively.
@@ -1088,7 +1084,7 @@ disabled version respectively.
 \begin{table}[H]\captionsetup{name=Listing}
 %\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Scalar source code to be automatically vectorized by clang\\
+    Scalar source code to be automatically vectorized by Clang\\
     \midrule
     \begin{VerbatimCompact}
 void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
@@ -1108,10 +1104,10 @@ void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-80e4: c5 fa 10 04 b2     vmovss (%rdx,%rsi,4),%xmm0
-80f1: c5 fa 10 0c 81     vmovss (%rcx,%rax,4),%xmm1
-80fe: c4 c2 79 a9 0c b8  vfmadd213ss (%r8,%rdi,4),%xmm0,%xmm1
-810c: c4 c1 7a 11 0c 81  vmovss %xmm1,(%r9,%rax,4)
+vmovss (%rdx,%rsi,4),%xmm0
+vmovss (%rcx,%rax,4),%xmm1
+vfmadd213ss (%r8,%rdi,4),%xmm0,%xmm1
+vmovss %xmm1,(%r9,%rax,4)
     \end{VerbatimCompact}
     \\
 \\
@@ -1122,7 +1118,7 @@ void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2,
 
 % \begin{table}[H]\captionsetup{name=Listing}
 % \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code written with clang's vector type\\
+    Source code written with Clang's vector type\\
     \midrule
     \begin{VerbatimCompact}
 typedef float floatZmm __attribute__((ext_vector_type(16)));
@@ -1145,28 +1141,28 @@ void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-82c0: 62 b1 7c 48 10 04 80   vmovups (%rax,%r8,4),%zmm0
-82c7: 62 b1 7c 48 10 0c 81   vmovups (%rcx,%r8,4),%zmm1
-82ce: 62 b2 7d 48 a8 0c 86   vfmadd213ps (%rsi,%r8,4),%zmm0,%zmm1
-82d5: 62 b1 7c 48 11 0c 87   vmovups %zmm1,(%rdi,%r8,4)
+vmovups (%rax,%r8,4),%zmm0
+vmovups (%rcx,%r8,4),%zmm1
+vfmadd213ps (%rsi,%r8,4),%zmm0,%zmm1
+vmovups %zmm1,(%rdi,%r8,4)
     \end{VerbatimCompact}
     \\
 \end{tabular}
 \caption{The toy example performs vectorized fused-multiply-add operation on
-every item from 3 input matrices and save the result to the output matrix. The
+every item from 3 input matrices and saves the result to the output matrix. The
 internal data structure of \texttt{matrix} is \texttt{std::vector}, and its
 member function \texttt{getItemPointer(r,c)} returns the pointer to the element
-at row \texttt{r} and column \texttt{c}. The key distinction between two
-vectorization approaches are the register types. \texttt{XMM}s are 128-bit
+at row \texttt{r} and column \texttt{c}. The key distinction between the two
+vectorization approaches is the register types. \texttt{XMM}s are 128-bit
 registers, while \zmm{}s are 512-bit long.}
 \label{table:vec-fma-float}
 \end{table}
 
 
-In some cases clang could be even worse, it may fail to recognize vectorization
+In some cases Clang could be even worse, it may fail to recognize vectorization
 patterns from element-wise loop operations, leading to more reduction in
 performance. In the \texttt{vec\char`_fma} example, by changing the type signature
-from \dtfloat{} to \texttt{int}, clang decides to dispatch scalar instructions
+from \dtfloat{} to \texttt{int}, Clang decides to dispatch scalar instructions
 for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
 (Listing \ref{vec-fma-int}). Their vectorized equivalency \texttt{vpaddd} and
 \texttt{vpmulld} is 15 times more performant (Figure
@@ -1177,8 +1173,8 @@ for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
     \begin{center}
     \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
     \end{center}
-    \caption{A benchmark for the element-wise multiply-add toy example on a 16
-        by 16 matrix with different vectorization techniques. The toy example
+    \caption{A benchmark for the element-wise multiply-add toy example on 16
+        by 16 matrices with different vectorization techniques. The toy example
         written with vector types are 5 to 10 times faster than their
         automatically vectorized or scalar counterpart. 
     % Also, \dtfloat{}
@@ -1190,7 +1186,7 @@ for addition (\texttt{add}) and multiplication (\texttt{imul}) completely
     \begin{table}[H]\captionsetup{name=Listing}
 %\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Scalar source code to be automatically vectorized by clang\\
+    Scalar source code to be automatically vectorized by Clang\\
     \midrule
     \begin{VerbatimCompact}
 void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2, 
@@ -1210,12 +1206,12 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-88b0: 44 8b 69 1c  mov    0x1c(%rcx),%r13d
-88b4: 44 8b 62 1c  mov    0x1c(%rdx),%r12d
-88b8: 45 0f af ee  imul   %r14d,%r13d
-88bc: 45 0f af e6  imul   %r14d,%r12d
-88c0: 45 01 fd     add    %r15d,%r13d
-88c3: 45 01 fc     add    %r15d,%r12d
+mov    0x1c(%rcx),%r13d
+mov    0x1c(%rdx),%r12d
+imul   %r14d,%r13d
+imul   %r14d,%r12d
+add    %r15d,%r13d
+add    %r15d,%r12d
     \end{VerbatimCompact}
     \\
 % \end{tabular}
@@ -1226,7 +1222,7 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
 % \begin{table}[H]\captionsetup{name=Listing}
 % \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
 \\
-    Vectorized source code using clang's vector type extension\\
+    Vectorized source code using Clang's vector type extension\\
     \midrule
     \begin{VerbatimCompact}
 typedef int intZmm __attribute__((ext_vector_type(16)));
@@ -1249,10 +1245,10 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-8880: 62 b1 fe 48 6f 04 81  vmovdqu64 (%rcx,%r8,4),%zmm0
-8887: 62 b2 7d 48 40 04 80  vpmulld (%rax,%r8,4),%zmm0,%zmm0
-888e: 62 b1 7d 48 fe 04 86  vpaddd (%rsi,%r8,4),%zmm0,%zmm0
-8895: 62 b1 fe 48 7f 04 87  vmovdqu64 %zmm0,(%rdi,%r8,4)
+vmovdqu64 (%rcx,%r8,4),%zmm0
+vpmulld (%rax,%r8,4),%zmm0,%zmm0
+vpaddd (%rsi,%r8,4),%zmm0,%zmm0
+vmovdqu64 %zmm0,(%rdi,%r8,4)
     \end{VerbatimCompact}
     \\
 \end{tabular}
@@ -1528,8 +1524,6 @@ anticipated arithmetic results, while overflow information are provided by
 \subsubsection{Implementation of Scalar \dtint{} and \dtlong{}
 Overflow Checking} 
 
-\hl{TODO:Not sure if this section is necessary or not?}
-
 Clang's language extension provides functions to perform overflow-checked
 integer arithmetics: 
 \begin{VerbatimCompact}
@@ -1540,7 +1534,8 @@ These functions take three arguments: \texttt{x} and \texttt{y} are the two
 input operands, and \texttt{sum} or \texttt{prod} is a pointer to the variable
 that will hold the result of the addition or multiplication. The return value of
 these functions is a boolean that indicates whether an overflow occurred during
-the operation.
+the operation. However, they do not accept vectors as input, 
+and a loop over these functions cannot be compiled to vector instructions.
 
 
 \subsection{Overflow Checking for Floating Points}
@@ -1635,7 +1630,7 @@ int fetestexcept(int excepts) {
 
 In the vectorized floating point scenario, the instruction for x87 status
 register is unnecessary and only the \mxcsr{} register should be concerned. The
-hot loop is completely vectorized, and clang dispatches 128-bit \texttt{SSE}
+hot loop is completely vectorized, and Clang dispatches 128-bit \texttt{SSE}
 instructions for occasional scalar operations. This is because the \texttt{SSE}
 execution units can handle both single and double precision floating point
 arithmetic natively, whereas the legacy x87 floating-point instructions operates
@@ -1839,6 +1834,11 @@ with the expectation.
 
 
 \chapter{Conclusion and Future work}
+
+In conclusion, this report presents a fast 
+
+
+
 
 \dthalf{} is a 16-bit floating point data structure, consisting of 1-bit sign,
 5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI
