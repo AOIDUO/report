@@ -320,9 +320,9 @@ selected 30-row and 19-column matrix. The achievements are:
 \section{Linear Programming and Simplex Algorithm}
 \label{simplex}
 Linear programming is a mathematical optimization technique used to model and
-find the best possible solution to a problem, given a set of constraints and an
-objective function to maximize or minimize. Its canonical form consists of a
-maximizing the objective function:
+find the best possible solution to a problem, given a set of constraints and 
+the objective function to maximize or minimize. Its canonical form consists of a
+objective function:
 \begin{math}
 Z = c_1x_1 + c_2x_2 + ... + c_nx_n
 \end{math}, subjecting to the constraints: \\
@@ -369,7 +369,8 @@ constraints at the same time. The matrix goes through a sequence of
 transformations, until the solution appears or the solution is not feasible. The
 transformations are called ``pivot'', and it solves the linear equation at the pivot
 row for the variable at the pivot column: 
-cccc\begin{table}[H]
+\vspace*{-4mm}
+\begin{table}[H]
 \begin{center}
 \begin{tabular}{llll}
 Pivot item           & $\alpha$ & $\rightarrow$ & $\frac{1}{\alpha}$            \\
@@ -381,11 +382,11 @@ Other entries         & $\delta$ & $\rightarrow$ & $\delta - \frac{\beta\gamma}{
 \end{table}
 \vspace*{-8mm}
 
-The pivot transformation involves division, and thereby produces rational
+The pivot transformation involves division and thereby produces rational
 numbers. Rationals of base 10 cannot be expressed as binary floating points
 precisely due to inaccuracy caused by potential rounding. In addition, divisions
-are expensive operations comparing to additions or multiplications. This issue
-can be addressed through demoralizing each row by multiplying each row with
+are expensive operations compared to additions or multiplications. This issue
+can be addressed through the normalization of rows, by multiplying each row with
 their common denominator~\cite{FPL1}: 
 \vspace*{-4mm}
 \begin{table}[H]
@@ -445,8 +446,8 @@ problems encountered during analyzing linear programs in cache analytical
 modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
 in the value of each element~\cite{FPL1}. Specifically, more than 99\% of the
-entries from matrices require less than 10 bits and 95\% of them are less than 20 columns
-(Figure \ref{small-val-low-dim}). Thus, most of the rows fit inside a 512-bit
+entries from matrices require less than 10 bits, and 95\% of them are less than 20 columns
+(Figure \ref{small-val-low-dim}). Thus, most rows fit inside a 512-bit
 vector register of 32 \dtshort{} elements, and a row operation can be done in a
 single instruction. 
 
@@ -462,17 +463,17 @@ single instruction.
 \end{figure}
 
 
-However, in rare and corner cases, there can be larger coefficients of up to 127
-bits. Practically, the upper bound of coefficient size is unknown, making it
-required to have arbitrary precision arithmetic \texttt{LargeInteger} as a
-backup. Also, the maximum observed column count is 28 and there is no certain
-maximum column count as well. 
+However, in rare and corner cases, large coefficients can be up to 127 bits.
+Practically, the upper bound of coefficient size is unknown, making it required
+to have arbitrary precision arithmetic \texttt{LargeInteger} as a backup. Also,
+the maximum observed column count is 28, and there is no specific maximum column
+count. 
 
 The FPL paper presents a 3-way transprecision implementation for the Presburger
 library's simplex solver using the algorithm described in Section \ref{simplex}.
 It starts from row-wise vectorized \dtshort{}, and will switch to  element-wise
 scalar \dtlong{} or element-wise scalar \texttt{LargeInteger} in case of
-overflow, as illustrated in Figure \ref{fig:fpl_arch}. But unfortunately the
+overflow, as illustrated in Figure \ref{fig:fpl_arch}. Unfortunately the
 MLIR upstream only presents a 2-layer transprecision, consisting of element-wise
 scalar operation using \dtlong{} and \texttt{LargeInteger}. The \dtshort{}
 version is not merged with the upstream for two reasons: 
@@ -508,12 +509,13 @@ instructions, for example, \dtshort{} saturated addition.
 
 Even though its specification was released by Intel in 2013, it had been
 unpopular ~\cite{linusHopeAvx512Die}, as it did not bring practical performance
-improvements. The primary reason was that it consumed a lot more power than
-usual, causing severe overheating. The micro-architecture Skylake from Intel,
-and its \texttt{AVX-512} enabled counterpart Skylake-X is a classic example.
-Skylake provides 2 256 bits FMA \texttt{AVX-2} execution units\footnote{Fused-multiply-add (FMA) execution units are a type of floating point
-execution units, capable of doing addition, multiplication or both in a single
-instruction. See Section \ref{sec:FMA}.} and Intel provides 2 512-bit
+improvements. The primary reason was that it consumed much more power than
+usual, causing severe overheating. A classic example is the micro-architecture
+Skylake from Intel and its \texttt{AVX-512} enabled counterpart Skylake-X.
+Skylake provides 2 256 bits FMA \texttt{AVX-2} execution
+units\footnote{Fused-multiply-add (FMA) execution units are a type of floating
+point execution units, capable of doing addition, multiplication, or both in a
+single instruction. See Section \ref{sec:FMA}.} and Intel provides 2 512-bit
 \texttt{AVX-512} FMA units by fusing the existing \texttt{AVX-2}  units into a
 \texttt{AVX-512} unit, then introduces an additional FMA \texttt{AVX-512}
 unit~\cite{SLK-X}. The additional \texttt{AVX-512} unit increases the heat flux
@@ -524,7 +526,7 @@ Intel attempted to mitigate this problem by introducing the
 instructions is encountered, the CPU automatically enters the
 \texttt{AVX-offset} mode and reduces its clock frequency \cite{AVX-offset}. This
 solution only works in theoretical benchmarks where \texttt{AVX-512}
-instructions present in large bulk, but in practice, it is more common to have a
+instructions are present in large bulk, but in practice, it is more common to have a
 mix of control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions. The
 clock frequency of executing those non-\texttt{AVX-512} instructions is
 decreased together with \texttt{AVX-512} instructions, causing many workloads
@@ -535,26 +537,25 @@ frequency~\cite{Zen4Critique}.
 
 
 % \subsection{AMD}
-AMD recently decides to add support for \texttt{AVX-512} in their latest
-micro-architecture Zen 4. It has slightly less computing power compared with
-Intel, but much more efficient. Zen 4 can be considered as the modernized version of
+AMD recently decided to add support for \texttt{AVX-512} in their latest
+micro-architecture Zen 4. It has slightly less computing power than
+Intel but is much more efficient. Zen 4 can be considered as the modernized version of
 Zen 3 or Zen 2, where Zen 2 and Zen 3 support \texttt{AVX-2}  by providing 2 FADD
 units \footnote{Floating-point add units (FADD) can execute addition
-instructions only. They may be considered as simplified FMA} and 2 FMA units of
+or float and doubleinstructions only. They may be considered as simplified FMA} and 2 FMA units of
 256-bit width \cite{Zen2ChipWiki}. Zen 4 ``double-pumps'' these existing circuits
 to create a single 512-bit FADD and a single 512-bit FMA, without introducing
 any new arithmetic units ~\cite{Zen4Critique}. Zen 2 and Zen 3 are reputable for
 their high performance per watt~\cite{ZenPerfPerWatt}, and Zen 4 would be better
 with its more advanced lithography~\cite{Zen4Critique}.
 
-Additionally, rebuilding existing software to target \texttt{AVX-512} may bring
-slight performance improvement. One benefit of \texttt{AVX-512} is that it
-reduces front-end pressure. In the case of the Zen 4 micro-architecture, though
-the back-end is possible to commit 2 \texttt{AVX-2} FADD and 2 \texttt{AVX-2}
-FMA every cycle, the front-end has to dispatch 4 instructions per cycle, which
-is quite difficult. The equivalency in \texttt{AVX-512} only takes 2
-instructions, this is much more likely to be sustained by the
-frontend~\cite{Zen4Critique}.
+Additionally, rebuilding existing software to target \texttt{AVX-512} may
+improve performance. One benefit of \texttt{AVX-512} is that it reduces
+front-end pressure. In the Zen 4 micro-architecture case, though the back-end is
+possible to commit 2 \texttt{AVX-2} FADD and 2 \texttt{AVX-2} FMA every cycle,
+the front-end has to dispatch 4 instructions per cycle, which is quite
+difficult. The equivalency in \texttt{AVX-512} only takes 2 instructions, and
+this is much more likely to be sustained by the frontend~\cite{Zen4Critique}.
 
 
 \section{Floating Points}
@@ -562,17 +563,18 @@ frontend~\cite{Zen4Critique}.
 \subsection{IEEE 754}
 \label{sec:IEEE754}
 IEEE 754 is the standard for representing and manipulating floating-point
-numbers in modern x86 computers. The standard defines several different formats
-for representing floating point numbers, the most common ones are 32-bit single
-precision (float) and 64-bit double precision (double). For each format, it
-specifies how many bits are used to represent the sign, exponent, and mantissa. 
+numbers in modern x86 computers. The standard defines several formats
+for representing floating point numbers. The most common ones are 32-bit single
+precision (float) and 64-bit double precision (double). For each format, the 
+specification
+defines how many bits are used to represent the sign, exponent, and mantissa. 
 
 For float and double, the sign bit is a single bit that indicates whether the
 number is positive or negative. As Figure \ref{fig:ieee-f32} shows, there are 8
-bits and 11 bits for exponent in float and double respectively, to represent
-represents the order of magnitude. The remaining 23 bits in float and 52 bits in
-double are mantissae, to store the fractional part of the number. The value of a
-floating point number can be computed through this formula: 
+bits and 11 bits for exponent in float and double, respectively, representing
+the order of magnitude. The remaining 23 bits in float and 52 bits in double are
+mantissae, to store the fractional part of the number. The value of a floating
+point number can be computed through this formula: 
 \begin{math} (-1)^s * 2^{(e - B)} * (1 + f)\end{math}
 where \begin{math}s\end{math} is sign, \begin{math}e\end{math} is exponent, 
 \begin{math}f\end{math} is mantissa and \begin{math}B\end{math} is a constant bias
@@ -585,7 +587,7 @@ sign     = 0b0        -> 0
 exponent = 0b01111100 -> 0b01111100 - 127 = 124 - 127 = -3
 mantissa = 0b01       -> 0b1.01 = 1.25
 \end{VerbatimCompact}
-Substituting the sign, exponent and mantissa into the formula, we get: \\
+Substituting the sign, the exponent, and the mantissa into the formula, we get: \\
 \texttt{-1\^{}0 * 2\^{}(-3) * 1.25 = 0.15625}.
 
 
@@ -619,27 +621,26 @@ created:
 
 FMA saves cycles and reduces the accumulation of rounding errors, while at the same
 time not adding significant complexity to the circuit. An FMA execution unit is
-capable to do FMUL, FADD, and FSUB as well: 
+capable of doing FMUL, FADD, and FSUB as well: 
 \begin{compactlist} 
 \item[] Addition: \begin{math}Y = (A * 1.0) + C \end{math} 
 \item[] Multiplication: \begin{math} Y = (A * B) + 0.0 \end{math} 
 \item[] Subtraction: \begin{math} Y = (A * -1.0) + C\end{math} 
 \end{compactlist} 
 
-This is a useful feature in many numerical computations that involve
+This feature is useful in many numerical computations involving
 simultaneous multiplication and addition operations, such as dot products and
 matrix multiplications. Since the \pivot{} function performs multiplications and
 additions between the pivot row, some constant value, and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
 
-\subsection{Representing ``\dtfloati{}'' and ``\dtdoublei{}'' Using
-Floating Points}
+\subsection{Representing ``\dtfloati{}'' and ``\dtdoublei{}'' Using Floating Points}
 \label{sec:fpe2}
 
 There is a common stereotype that floating-point numbers are unreliable and
 likely to be imprecise, and are often illustrated in popular memes as shown in
 Figure \ref{meme}~\cite{meme}. However, when storing integer values inside
-floating points, floating points can be quite reliable. In fact, historically
+floating points, floating points can be pretty reliable. Historically
 floating point processing units in GPUs have been utilized for fast integer
 arithmetic, for example, modular exponentiation \cite{intfpu-modexp} and RSA
 algorithms~\cite{intfpu-rsa}, because often the architecture of GPU prioritizes
@@ -648,14 +649,14 @@ the performance of floating points rather than integers.
 Given that the mantissa part of a float consists of 23 bits,
 inexactness never occurs when representing integers less than 23 bits (ignoring
 the sign bit). Furthermore, in case of an integer overflow, floating point
-imprecision almost always occurs and a corresponding status register is set.
+imprecision almost always occurs, and setting a corresponding status register.
 The same concept applies to double data types, which have a mantissa consisting
 of 52 bits.
 
 This mechanism is reliable, as floating-point inexactness always implies
-integer-inexactness. For an integer value with a bit width greater than the
+integer-inexactness. For an integer value with a bit width bigger than the
 mantissa size, floating point rounding is triggered to fit the most
-significant bits of the integer in the mantissa, and then adjust the order of
+significant bits of the integer in the mantissa, then adjust the order of
 magnitude in the exponent accordingly. The lower bits of the mantissa are
 truncated, therefore causing imprecision. 
 
@@ -734,20 +735,20 @@ BM_SomeFunction       18.5 ns         18.5 ns     37935734
 
 The warning: ``CPU scaling is enabled, the benchmark real-time measurements may
 be noisy and will incur extra overhead.'' is saying that CPU clock frequency is
-not consistent. It can be dynamically determined by the governor algorithm,
+not consistent. It can be dynamically determined by the governor algorithm
 according to the system's needs. For example, with the \texttt{performance}
 governor, the OS locks the CPU to the highest possible clock frequency,
 specified at
-\texttt{/sys/devices/system/cpu/cpu*/cpufreq/scaling\char`_max\char`_freq},
-while the \texttt{ondemand} governor will push the CPU to the highest frequency
-on demand and then gradually reduce the frequency as the idle time increases
-\cite{archLinuxFreqScal}.
+\texttt{/sys/devices/system/cpu/cpu*/cpufreq/scaling\char`_max\char`_freq}. In
+contrast, the \texttt{ondemand} governor will push the CPU to the highest
+frequency on demand and then gradually reduce the frequency as the idle time
+increases \cite{archLinuxFreqScal}.
 
 However, it is also dependent on the manufacture and other hardware constraints.
 By default, both Intel (Turbo Boost) and AMD (Precision Boost Overdrive) have
 support for raising clock frequency, beyond the control of the governor
 \cite{GoogleBenchReduceVariance}. On the other hand, CPUs have self-protecting
-thermal throttling mechanisms that reduce its clock frequency and voltage when
+thermal throttling mechanisms that reduce their clock frequency and voltage when
 it is too hot. 
 
 The benchmark mentioned in this report were performed on an AMD 7950x desktop
@@ -774,7 +775,7 @@ the given instructions will execute on the specified micro-architecture. It
 first summarizes the instruction per clock (IPC) and throughput of the entire
 instruction block, then gives detailed information about each instruction,
 including the number of uOps, latency, throughput, potential load, store, and side
-effects. \mca{} also reports resource pressure in terms of arithmetic units and
+effects. \mca{} also reports resource pressure regarding arithmetic units and
 memory load or store units. When the optional \texttt{-timeline} flag is
 prompted, \mca{} illustrates a timeline view of the analyzed code, showing how
 instructions progress through the pipeline stages of the target processor. The
@@ -786,8 +787,8 @@ An example is provided below. The analysis from \mca{} indicates that a
 \texttt{vmovaps}\footnote{\texttt{vmovaps} can be either vector float load or
 store instruction, depending on how operands are structured~\cite{instruction}.}
 and \texttt{vfmadd213ps}\footnote{\texttt{vfmadd213ps} is the instruction for
-fused-multiply-add~\cite{instruction}.} instructions every 1.3 cycles. This
-translates to 2.74 instructions per cycle. The output from \mca{} is slightly
+fused-multiply-add~\cite{instruction}.} instructions every 1.3 cycles, or 
+equivalently 2.74 instructions per cycle. The output from \mca{} is slightly
 modified and truncated to fit inside the page.
 % $ cat x.s
 % vmovaps (%rdx,%rsi,4),%ymm0
@@ -920,7 +921,7 @@ subsequently resolved after rerunning \exegesis{} and confirming that
 \texttt{znver3} indeed has higher throughput than expected. 
 
 This issue suggests that \mca{} is not a reliable tool for analyzing machine
-code, but rather a evaluator for Clang's behavior during instruction selection.
+code but rather an evaluator for Clang's behavior during instruction selection.
 Therefore, this report chooses Google Benchmark as the performance measuring
 tool.
 
@@ -928,8 +929,8 @@ tool.
 \chapter{Experiments with Toy Example}
 \label{sec:Toy}
 
-The \pivot{} function does multiply and add for each row in the matrix,
-therefore the performance of FMA a simple vector toy can be an effective
+The \pivot{} function does multiply and add for each row in the matrix;
+therefore the performance of a FMA simple vector toy can be an effective
 indicator. This chapter reports performance analysis on simple toy examples that
 do vector add or vector FMA with various setups, including: 
 
