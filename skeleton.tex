@@ -237,10 +237,10 @@ floating points, making floating points overflow detection almost free.
 Previously there was an attempt to vectorize \texttt{pivot} that utilizes
 \dtshort{} and targets matrices with 32 columns or less~\cite{FPL2}. This
 approach offers the advantage of being able to pack a row of 32 elements into a
-single \texttt{AVX-512} register and addresses issues 1 and 2. However, overflow
+single AVX-512 register and addresses issues 1 and 2. However, overflow
 is still checked manually, causing 4 times more instruction count (Section
 \ref{sec:i16-overflow-checking}). Additionally, this approach introduces a new
-disadvantage. The \texttt{AVX-512} extension is required for CPUs to support
+disadvantage. The AVX-512 extension is required for CPUs to support
 vectorized \dtshort{}, and this is very rare among CPUs manufactured in the last
 decade (Section \ref{sec:avx512}). 
 
@@ -264,10 +264,10 @@ average cost of resetting per \pivot{} can be treated as negligible, while the
 superscalar and out-of-order execution pipeline hides the latency of reading the
 status register. Moreover, floating points offer better compatibility with old
 computers than \dtshort{}. Vector \dtfloat{} or \dtdouble{} code can be executed
-on CPUs with \texttt{AVX-2}, the predecessor of \texttt{AVX-512}. Almost every
-x86 CPU from the last decade supports \texttt{AVX-2}. 
+on CPUs with AVX-2, the predecessor of AVX-512. Almost every
+x86 CPU from the last decade supports AVX-2. 
 % It can also be adapted to
-% fit even older \texttt{AVX-128} and \texttt{SSE} CPUs with slight change in the
+% fit even older \texttt{AVX-128} and SSE CPUs with slight change in the
 % source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
@@ -305,10 +305,10 @@ selected 30-row and 19-column matrix. The achievements are:
     % ,  \dtshort{} completes 6 ns ahead.
     % , which renders the 6 ns gap trivial. 
     \item The \dtfloat{} implementation offers substantial compatibility
-    advantage over \dtshort{} for the vast amount of non-\texttt{AVX-512}
+    advantage over \dtshort{} for the vast amount of non-AVX-512
     platforms. Even though the \dtshort{} version is 6 ns faster than the
     \dtfloat{} version, the significant improvement from the upstream 
-    together with \texttt{AVX-2}'s compatibility
+    together with AVX-2's compatibility
     renders the 6 ns gap trivial. 
 \end{enumerate}
 
@@ -478,7 +478,7 @@ MLIR upstream only presents a 2-layer transprecision, consisting of element-wise
 scalar operation using \dtlong{} and \texttt{LargeInteger}. The \dtshort{}
 version is not merged with the upstream for two reasons: 
 \begin{compactlist} 
-    \item \dtshort{} vectors require \texttt{AVX-512} ISA extension, but hardware
+    \item \dtshort{} vectors require AVX-512 ISA extension, but hardware
     support is rare (Section \ref{sec:avx512}). 
     \item Despite the \dtshort{} version being fast, overflow checking overhead
     is 65\%~\cite{FPL2}. Using floating points could significantly reduce this
@@ -500,9 +500,9 @@ version is not merged with the upstream for two reasons:
 \section{Modern CPU Micro-architecture}
 \label{sec:avx512}
 
-A recent trend in the development of the x86-64 architecture is to include \texttt{AVX-512}
-instruction set architecture (ISA) extension. \texttt{AVX-512} succeeds \texttt{AVX-2}, the vector
-width is increased from \texttt{AVX-2}’s 256 bits to 512 bits. \texttt{AVX-512} also provides new
+A recent trend in the development of the x86-64 architecture is to include AVX-512
+instruction set architecture (ISA) extension. AVX-512 succeeds AVX-2, the vector
+width is increased from AVX-2’s 256 bits to 512 bits. AVX-512 also provides new
 instructions, for example, \dtshort{} saturated addition.
 
 % \subsection{Intel}
@@ -511,36 +511,36 @@ Even though its specification was released by Intel in 2013, it had been
 unpopular ~\cite{linusHopeAvx512Die}, as it did not bring practical performance
 improvements. The primary reason was that it consumed much more power than
 usual, causing severe overheating. A classic example is the micro-architecture
-Skylake from Intel and its \texttt{AVX-512} enabled counterpart Skylake-X.
-Skylake has 2 256 bits FMA \texttt{AVX-2} execution
+Skylake from Intel and its AVX-512 enabled counterpart Skylake-X.
+Skylake has 2 256 bits FMA AVX-2 execution
 units\footnote{Fused-multiply-add (FMA) execution units are a type of floating
 point execution units, capable of doing addition, multiplication, or both in a
 single instruction. See Section \ref{sec:FMA}.}. For Skylake-X Intel provides 2
-512-bit \texttt{AVX-512} FMA units by fusing the existing \texttt{AVX-2} units
-into a \texttt{AVX-512} unit, then introduces an additional FMA \texttt{AVX-512}
-unit~\cite{SLK-X}. The additional \texttt{AVX-512} unit increases the heat flux
+512-bit AVX-512 FMA units by fusing the existing AVX-2 units
+into a AVX-512 unit, then introduces an additional FMA AVX-512
+unit~\cite{SLK-X}. The additional AVX-512 unit increases the heat flux
 density of the chip, causing server thermal throttling issues. 
 
 Intel attempted to mitigate this problem by introducing the
-``\texttt{AVX-offset}'' mode. When a workload involving \texttt{AVX-512}
+``AVX-offset'' mode. When a workload involving AVX-512
 instructions is encountered, the CPU automatically enters the
-\texttt{AVX-offset} mode and reduces its clock frequency \cite{AVX-offset}. This
-solution only works in theoretical benchmarks where \texttt{AVX-512}
+AVX-offset mode and reduces its clock frequency \cite{AVX-offset}. This
+solution only works in theoretical benchmarks where AVX-512
 instructions are present in large bulk, but in practice, it is more common to have a
-mix of control flow, scalar, \texttt{SSE} and \texttt{AVX-512} instructions. The
-clock frequency of executing those non-\texttt{AVX-512} instructions is
-decreased together with \texttt{AVX-512} instructions, causing many workloads
-could run faster with disabled \texttt{AVX-512} and higher clock
+mix of control flow, scalar, SSE and AVX-512 instructions. The
+clock frequency of executing those non-AVX-512 instructions is
+decreased together with AVX-512 instructions, causing many workloads
+could run faster with disabled AVX-512 and higher clock
 frequency~\cite{Zen4Critique}. 
 
 % \hlc[pink]{OptionalTODO: alderlake disabled avx-512 for big.LITTLE}
 
 
 % \subsection{AMD}
-AMD recently decided to add support for \texttt{AVX-512} in their latest
+AMD recently decided to add support for AVX-512 in their latest
 micro-architecture Zen 4. It has slightly less computing power than
 Intel but is much more efficient. Zen 4 can be considered as the modernized version of
-Zen 3 or Zen 2, where Zen 2 and Zen 3 support \texttt{AVX-2}  by providing 2 FADD
+Zen 3 or Zen 2, where Zen 2 and Zen 3 support AVX-2  by providing 2 FADD
 units\footnote{Floating-point add units (FADD) can execute floating point addition
  instructions only. They are less capable compared to FMA.} and 2 FMA units of
 256-bit width \cite{Zen2ChipWiki}. Zen 4 ``double-pumps'' these existing circuits
@@ -549,12 +549,12 @@ any new arithmetic units ~\cite{Zen4Critique}. Zen 2 and Zen 3 are reputable for
 their high performance per watt~\cite{ZenPerfPerWatt}, and Zen 4 would be better
 with its more advanced lithography~\cite{Zen4Critique}.
 
-Additionally, rebuilding existing software to target \texttt{AVX-512} may
-improve performance. One benefit of \texttt{AVX-512} is that it reduces
+Additionally, rebuilding existing software to target AVX-512 may
+improve performance. One benefit of AVX-512 is that it reduces
 front-end pressure. In the Zen 4 micro-architecture case, though the back-end is
-possible to commit 2 \texttt{AVX-2} FADD and 2 \texttt{AVX-2} FMA every cycle,
+possible to commit 2 AVX-2 FADD and 2 AVX-2 FMA every cycle,
 the front-end has to dispatch 4 instructions per cycle, which is quite
-difficult. The equivalency in \texttt{AVX-512} only takes 2 instructions, and
+difficult. The equivalency in AVX-512 only takes 2 instructions, and
 this is much more likely to be sustained by the frontend~\cite{Zen4Critique}.
 
 
@@ -634,7 +634,7 @@ matrix multiplications. Since the \pivot{} function performs multiplications and
 additions between the pivot row, some constant value, and each row in the matrix,
 the performance of FMA is critical to the overall efficiency of the algorithm. 
 
-\subsection{Representing ``\dtfloati{}'' and ``\dtdoublei{}'' Using Floating Points}
+\subsection{Representing ``\dtfloati{}'' and ``\dtdoublei{}'' \\ Using Floating Points}
 \label{sec:fpe2}
 
 There is a common stereotype that floating-point numbers are unreliable and
@@ -653,8 +653,8 @@ imprecision almost always occurs, and setting a corresponding status register.
 The same concept applies to double data types, which have a mantissa consisting
 of 52 bits.
 
-This mechanism is reliable, as floating-point inexactness always implies
-integer-inexactness. For an integer value with a bit width bigger than the
+This mechanism is reliable, as floating-point inexactness always implies 
+integer\linebreak-inexactness. For an integer value with a bit width bigger than the
 mantissa size, floating point rounding is triggered to fit the most
 significant bits of the integer in the mantissa, then adjust the order of
 magnitude in the exponent accordingly. The lower bits of the mantissa are
@@ -709,8 +709,9 @@ BENCHMARK(BM_SomeFunction);
 BENCHMARK_MAIN();
 \end{verbatim}
 
-The library first starts a timer, repeatedly executes its core loop: \texttt{for
-(auto \char`_ : state) ... } multiple times then pauses the timer. This method
+The library first starts a timer, repeatedly executes its core loop: \linebreak
+\texttt{for (auto \char`_ : state) ... } 
+multiple times then pauses the timer. This method
 ensures that the results are consistent and minimizes the overhead required for
 recording the timing information. 
 
@@ -1006,7 +1007,7 @@ respectively, on a Zen 4 computer with \texttt{clang-15}.}
 \end{table}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
-After compiling on a \texttt{AVX-512} enabled computer and disassembling the
+After compiling on a AVX-512 enabled computer and disassembling the
 binary, it is observed that Clang automatically packs 16 \dtfloat{} (512 bits)
 as an operand of the \texttt{vaddps} instruction. 
 
@@ -1032,7 +1033,7 @@ type of the elements in the vector. For example,
 typedef int16_t int16x32 __attribute__((ext_vector_type(32)))
 \end{VerbatimCompact}
 defines a 512-bit vector type of \texttt{int16x32}, consisting of 32
-\texttt{int16\char`_t} and fits inside an \texttt{AVX-512} \zmm{} register. 
+\texttt{int16\char`_t} and fits inside an AVX-512 \zmm{} register. 
 
 After defining a vector data type, a vector variable can be created by casting
 from a pointer of the target array. Then arithmetic operators can be applied
@@ -1434,10 +1435,10 @@ worse performance.
 % be noted that there are no equivalent instructions for \texttt{int32_t} and
 % \texttt{int64_t}.
 
-One advantage of \dtshort{} is that it can be used with \texttt{AVX-512}'s
+One advantage of \dtshort{} is that it can be used with AVX-512's
 saturated add and multiply higher bits vector instructions (Figure
 \ref{archtable}), making it possible and convenient to write vectorized and
-overflow-aware code. However, Zen 4's implementation of \texttt{AVX-512}
+overflow-aware code. However, Zen 4's implementation of AVX-512
 extension does not provide equivalent instruction for \dtint{} or \dtlong{} and
 therefore must be processed as scalar values.
 % When the
@@ -1491,7 +1492,7 @@ runtime~\cite{FPL2}.
 \begin{table}[ht]
 \centering
 %\captionsetup{justification=centering}
-\begin{tabular}{  c  L{5.5cm} L{5.5cm}  } 
+\begin{tabular}{  L{2cm}  L{5.5cm} L{5.5cm}  } 
      & Addition & Multiplication \\ 
     \midrule
         Overflow ignored 
@@ -1607,7 +1608,7 @@ In case of returning \texttt{false}, the caller will retry computation using
 \subsubsection{Evaluation}
 In x86\_64 there are two status registers for floating points, the legacy x87
 status register for traditional scalar floating point operation and the modern
-\mxcsr{} register for \texttt{SSE} or \texttt{AVX} instructions. The source code
+\mxcsr{} register for SSE or AVX instructions. The source code
 of the library function \texttt{fetestexcept} indeed manipulates both registers
 \cite{fenvlib}: 
 \begin{verbatim}
@@ -1630,12 +1631,12 @@ int fetestexcept(int excepts) {
 
 In the vectorized floating point scenario, the instruction for the x87 status
 register is unnecessary, and only the \mxcsr{} register should be concerned. The
-hot loop is completely vectorized, and Clang dispatches 128-bit \texttt{SSE}
-instructions for occasional scalar operations. The reason is that the \texttt{SSE}
+hot loop is completely vectorized, and Clang dispatches 128-bit SSE
+instructions for occasional scalar operations. The reason is that the SSE
 execution units can handle both single and double precision floating point
 arithmetic natively. In contrast, the legacy x87 floating-point instructions operate
 on an 80-bit internal format, requiring additional conversions and delay. Using
-\texttt{SSE} instructions reduce register pressure as well. The \texttt{SSE}
+SSE instructions reduce register pressure as well. The SSE
 units have access to 16 \xmm{} registers, but for x87 units, only 8
 floating point registers are available~\cite{x87-bad}. 
 
@@ -1679,9 +1680,9 @@ the reasoning from previous chapters, where overhead for \dtfloat{} is a
 one-time expense, but for \dtshort{} it is always a portion of the total
 runtime. 
 
-Note that even though \dtshort is faster than \dtfloat in this benchmark, it is
-not sound to conclude that the \pivot{} function implemented in \dtshort will be
-faster than \dtfloat. The toy example is different from the \pivot function in
+Note that even though \dtshort{} is faster than \dtfloat{} in this benchmark, it is
+not sound to conclude that the \pivot{} function implemented in \dtshort{} will be
+faster than \dtfloat{}. The toy example is different from the \pivot{} function in
 many aspects, for example, the number of memory load operations. In the actual
 \pivot{} function, \dtfloat{} may potentially outperform \dtshort{}. 
 
@@ -1831,8 +1832,8 @@ and 2 \zmm{} registers.
     \label{fig:specialization}
 \end{figure}
 
-By integrating the aforementioned optimizations and running a benchmark for the
-\pivot{} function, it is discovered that:
+By integrating the aforementioned optimizations and running a benchmark (Figure
+\ref{fig:specialization}) for the \pivot{} function, it is discovered that:
 \begin{enumerate}
     \item The \dtshort{} approach from FPL~\cite{FPL2} costs 20 ns, this is 6 ns
     faster than the \dtfloat{} approach proposed by this report. A possible
@@ -1840,11 +1841,11 @@ By integrating the aforementioned optimizations and running a benchmark for the
     IO~\cite{Zen4Critique}. The algorithm using \dtfloat{} could be IO-bounded. 
     \item The benchmark confirms the expectation in Section
     \ref{sec:ColumnSizeSpecialization}.
-    \item For Zen 4, migrating \texttt{AVX-2} code to \texttt{AVX-512} indeed
+    \item For Zen 4, migrating AVX-2 code to AVX-512 indeed
     brings some performance increments. The \pivot{} function using \dtfloat{}
     and 2 \zmm{} for a row is 1.4 ns faster than the one using 4 \ymm{} for a
     row. The benchmark confirms the theoretical benefit of AMD's implementation
-    on \texttt{AVX-512} mentioned in Section \ref{sec:avx512}.
+    on AVX-512 mentioned in Section \ref{sec:avx512}.
 
 \end{enumerate}
 
@@ -1853,7 +1854,7 @@ By integrating the aforementioned optimizations and running a benchmark for the
 % Nevertheless, both of them significantly outperform the upstream scalar
 % implementation, which renders the 6 ns gap trivial. 
 % Additionally, \dtfloat{} offers substantial compatibility advantage
-% over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
+% over \dtshort{} for vast amount of non-AVX-512 platforms. 
 
 
 \chapter{Conclusion and Future Work}
@@ -1874,7 +1875,7 @@ programs using linear programming of the simplex method. The procedures are:
 I achieved 20 times speedup over the upstream implementation, but unfortunately,
 it is about 20\% slower than the FPL's approach. Nevertheless, my method is
 superior in terms of compatibility. The FPL's approach requires
-\texttt{AVX-512}, but mine works on old and vastly more common \texttt{AVX-2}
+AVX-512, but mine works on old and vastly more common AVX-2
 CPUs.
 
 
@@ -1885,7 +1886,7 @@ a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa (Figure
 needed, \dthalf{} provides performance benefits over \dtfloat{} and
 \dtdouble{}~\cite{fp16-fast}. It has been supported natively on GPUs since
 2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future
-\texttt{AVX} extensions, it would potentially further improve the performance of
+AVX extensions, it would potentially further improve the performance of
 \pivot{}. The \dthalfi{} data type can be defined using the 10-bit
 mantissa, which covers 99\% of the elements in the constraint
 matrices~\cite{FPL1}. It is expected to improve the runtime of the \pivot{}
