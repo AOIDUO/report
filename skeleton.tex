@@ -930,9 +930,9 @@ tool.
 \label{sec:Toy}
 
 The \pivot{} function does multiply and add for each row in the matrix;
-therefore the performance of a FMA simple vector toy can be an effective
-indicator. This chapter reports performance analysis on simple toy examples that
-do vector add or vector FMA with various setups, including: 
+therefore, the performance of an simple FMA toy can be an effective indicator.
+This chapter reports performance analysis on simple toy examples with various
+setups, including: 
 
 \begin{enumerate} 
     \item Vectorization method 
@@ -1706,53 +1706,53 @@ of the actual \pivot{} function, float may potentially outperform int16.
 \section{Matrix-wise Transprecision}
 Transprecision techniques can be implemented at different levels of scale, such
 as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
-are implemented using the matrix-wise transprecision style. For \dtfloat{},
-the \mxcsr{} register accumulates information regarding previous occurrences of
-overflow and imprecision, until it is cleared manually. 
+are implemented using the matrix-wise transprecision style. For \dtfloat{}, the
+\mxcsr{} register accumulates information regarding previous overflow and
+imprecision occurrences until it is cleared manually. 
 
-The element-wise method is not suitable in this scenario, as it defeats the
+The element-wise method is unsuitable in this scenario, as it defeats the
 purpose of vectorization. The row-wise method is not chosen either, due to that
-overflow is not likely to occur and the matrix is small. Reading the \mxcsr{}
-can be considered as a expensive operation, comparing to the time spent on
-pivoting through the entire matrix. Avoiding wasted arithmetic instructions
-after overflow at the cost of more \mxcsr{} reads is not a cost-effective
+overflow is not likely to occur, and the matrix is small. Reading the \mxcsr{}
+can be considered as an expensive operation compared to the time spent on
+pivoting through the entire matrix. Avoid wasting arithmetic instructions
+after overflowing at the cost of more \mxcsr{} reads is not a cost-effective
 trade-off.
 
 Even though the \pivot{} function using \dtshort{} was implemented using the
 row-transprecision approach in previous works~\cite{FPL2}, it is modified to
-match with the matrix-wise transprecision style, in order to control differences
+match with the matrix-wise transprecision style to control differences
 between the \dtfloat{} counterpart. After the overflow checking instructions,
 instead of a branch instruction pointing to the overflow handler, the boolean
-operator OR is applied between that overflow checking result register and a
+operator OR is applied between that overflow checking result register and an
 overflow flag. 
 
 
 \section{Double Buffering}
 
-Double buffering is a powerful technique to address the issue of data pollution
+Double buffering is a powerful technique to resolve the issue of data pollution
 caused by overflown data. When matrix-wise computing is carried out, a potential
 overflow can contaminate the input matrix and write meaningless results into it.
 It is difficult to recover from overflown results, making it impossible to
-dispatch the same input matrix to a algorithm of higher precision and defeating
+dispatch the same input matrix to an algorithm of higher precision and defeating
 the purpose of transprecision computing.
 
-Double buffering addresses this challenge by allocating two distinct pieces of
-memory, one for the input matrix and the other for output matrix. The input
-matrix is read-only, while the output matrix allows both reading and writing.
+Double buffering addresses this problem by allocating two pieces of
+memory, one for the input matrix and the other for the output matrix. The input
+matrix is read-only, while the output matrix allows read and write.
 This separation of data storage ensures that the input matrix remains unpolluted
 by overflown data and that any potential overflow is encapsulated within the
 separate output matrix. 
 
 While making a copy of the input matrix is a simple and easy solution for
 protecting the original data from pollution, double buffering is a superior
-technique due that it does not introduce additional memory operations. With
+technique because it does not introduce additional memory operations. With
 double buffering, every operand requires a load operation from the input matrix,
 and every result takes a store operation to be written into the output matrix.
-This is the minimal amount of memory operation required for arithmetics. Zen 4 is
-capable of loading one \zmm{} vector per cycle and storing one \zmm{} vector per two
+This is the minimal amount of memory operation required for arithmetics. Zen 4
+can load one \zmm{} vector per cycle and store one \zmm{} vector per two
 cycles. In comparison, it can do two multiplication or addition of \zmm{}
 vectors every cycle. The discrepancy in throughput between computing and IO
-suggests that memory copy very expensive and inefficient. 
+suggests that memory copy is very expensive and inefficient. 
 
 \section{Alignment}
 In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
@@ -1762,9 +1762,9 @@ assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}.
 and \texttt{instruction} for 
 ``Move Unaligned Packed Integer Values''~\cite{vmovdqu64}. 
 
-Unaligned load may bring potential performance impacts. When accessing memory,
+An unaligned load may bring potential performance impacts. When accessing memory,
 the CPU retrieves data from the main memory or cache in units of cache lines. On
-Zen 4 the size of cache line is 512-bits, exactly the size of a \zmm{} register
+Zen 4, the size of a cache line is 512 bits, precisely the size of a \zmm{} register
 \cite{AMDManual}. Alignment guarantees that a single cache line can cover a
 vector register. Otherwise, a \zmm{} register might be spitted on two cache lines.
 Both cache lines of 1028 bits have to be requested from the memory, then
@@ -1772,8 +1772,8 @@ performs a shift to extract the desired 512 bits~\cite{Unaligned}.
 
 To address this issue, an aligned allocator is given to the constructor of
 \texttt{std::vector} when initializing a matrix~\cite{FPL2}. 
- The compiler is capable of recognizing alignment
-and issue aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps}
+ The compiler can recognize alignment
+and issuing aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps}
 accordingly. 
 
 \section{Reduce Number of Matrix Index Computation}
@@ -1785,8 +1785,8 @@ item of the matrix can be found in the array by computing the index:
 \texttt{column count * row + column}. The matrix data structure can be further
 optimized if the number of index computations can be reduced. By placing the
 pivot row as the first row in the matrix, it is only required to compute the
-address once for the first element of the matrix, then every subsequent item can
-be indexed by incrementing the address. 
+address once for the first element of the matrix, and then every subsequent item
+can be indexed by incrementing the address. 
 
 % \subsection{Loop unrolling}
 
@@ -1800,14 +1800,14 @@ columns~\cite{FPL1}. A \ymm{} register can pack 8 \dtfloat{}s, and a \zmm{}
 register can pack 16 \dtfloat{}s (Figure \ref{archtable}). When padding each row
 of the matrix to 32 columns using 2 \zmm{} registers, at least 12 \dtfloat{}s
 are wasted. Alternatively, the rows can be padded to 24 columns using 3 \ymm{}
-registers, and reducing the minimal padding size to 4 \dtfloat{}s.
+registers, reducing the minimal padding size to 4 \dtfloat{}s.
 
-Since \ymm{} registers have double amount of execution units than \zmm{}
-registers, while there will be only 50\% more instruction count, specialize the
+Since \ymm{} registers have double the amount of execution units than \zmm{}
+registers, while there will be only 50\% more instruction count, specializing 
 most of the cases of less than 24 columns with 3 \ymm{} registers is expected to
-be faster than a more genetic implementation of 32 columns and 2 \zmm{}
-registers. Benchmark illustrated in Figure \ref{fig:specialization} confirms
-with the expectation. 
+be faster than a more generic implementation of 32 columns and 2 \zmm{}
+registers. The Benchmark illustrated in Figure \ref{fig:specialization} confirms
+the expectation. 
 
 \begin{figure}[H]
     \begin{center}
@@ -1836,19 +1836,19 @@ with the expectation.
 \chapter{Conclusion and Future Work}
 
 In conclusion, this report presents a fast implementation of the \pivot{}
-function using \dtfloat{}, to address performance bottlenecks when MLIR analysis
-programs using linear programming of simplex method. The procedures are: 
+function using \dtfloat{} to address performance bottlenecks when MLIR analysis
+programs using linear programming of the simplex method. The procedures are: 
 \vspace*{-2.2mm}
 \begin{compactlist}
     \item Write source code using Clang's vector type extension to guarantee
     vectorization.
-    \item Reduce the bit width of each element in the input matrix. High
-    precision data types are unnecessary for \pivot{}.
+    \item Reduce the bit width of each element in the input matrix.
+    High-precision data types are unnecessary for \pivot{}.
     \item Perform integer arithmetics with FPU to leverage floating point's
     automatic overflow detection.
 \end{compactlist}
 
-I achieved 20 times speedup over the upstream implementation, but unfortunately
+I achieved 20 times speedup over the upstream implementation, but unfortunately,
 it is about 20\% slower than the FPL's approach. Nevertheless, my method is
 superior in terms of compatibility. The FPL's approach requires
 \texttt{AVX-512}, but mine works on old and vastly more common \texttt{AVX-2}
@@ -1857,16 +1857,16 @@ CPUs.
 
 My techniques of optimizing the \texttt{pivot} function could make further
 progress with the 16-bit floating point data structure \dthalf{}. It consists of
-a 1-bit sign, a 5-bit exponent and a 10-bit mantissa (Figure
+a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa (Figure
 \ref{fig:ieee-f16}). For some AI applications where high precision is not
 needed, \dthalf{} provides performance benefits over \dtfloat{} and
 \dtdouble{}~\cite{fp16-fast}. It has been supported natively on GPUs since
 2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future
 \texttt{AVX} extensions, it would potentially further improve the performance of
-\pivot{}. The \dthalfi{} data type can be defined using the 10-bit mantissa, and
-it covers 99\% of the elements in the constraint matrices~\cite{FPL1}. It is
-expected to improve the the runtime of the \pivot{} function by 2 times, if
-\dtfloati{} is replaced with \dthalfi{}.
+\pivot{}. The \dthalfi{} data type can be defined using the 10-bit
+mantissa, which covers 99\% of the elements in the constraint
+matrices~\cite{FPL1}. It is expected to improve the runtime of the \pivot{}
+function by 2 times if \dtfloati{} is replaced with \dthalfi{}.
 
 %  overflow-ignored version, and the runtime
 % can be reduced to about 50\% comparing to the \pivot{} function implemented
