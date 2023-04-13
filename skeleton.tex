@@ -1840,15 +1840,13 @@ with the expectation.
 \dthalf{} is a 16-bit floating point data structure, consisting of 1-bit sign,
 5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI
 applications where high precision is not needed, \dthalf{} provides performance
-benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}.
-
-16-bit floating point has been supported natively on GPUs since
-2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future
-\texttt{AVX} extensions, it would potentially further improve the performance of
-\pivot{}. The \dthalfi{} data type can be defined using the 10-bit mantissa, and
-it covers 99\% of the elements in the constraint matrices~\cite{FPL1}. It is
-expected to improve the the runtime of the \pivot{} function by 2 times, if
-\dtfloati{} is replaced with \dthalfi{}.
+benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}. It has been supported
+natively on GPUs since 2016~\cite{pascal-intro-fp16}, and if this data type is
+integrated into future \texttt{AVX} extensions, it would potentially further
+improve the performance of \pivot{}. The \dthalfi{} data type can be defined
+using the 10-bit mantissa, and it covers 99\% of the elements in the constraint
+matrices~\cite{FPL1}. It is expected to improve the the runtime of the \pivot{}
+function by 2 times, if \dtfloati{} is replaced with \dthalfi{}.
 
 %  overflow-ignored version, and the runtime
 % can be reduced to about 50\% comparing to the \pivot{} function implemented
