@@ -448,7 +448,7 @@ problems encountered during analyzing linear programs in cache analytical
 modeling, polyhedral loop optimization, and accelerator code generation. It is
 found that most of the constraint matrices are low in dimensionality and small
 in the value of each element~\cite{FPL1}. Specifically, more than 99\% of the
-coefficients require less than 10 bits and 95\% of them are less than 20 columns
+entries from matrices require less than 10 bits and 95\% of them are less than 20 columns
 (Figure \ref{small-val-low-dim}). Thus, most of the rows fit inside a 512-bit
 vector register of 32 \dtshort{} elements, and a row operation can be done in a
 single instruction. 
@@ -1665,7 +1665,7 @@ faster.}
 
 \subsection{Comparing \dtshort{} and \dtfloat{}}
 
-Section \ref{sec:width}, \ref{sec:overflow-int} and \ref{sec:overflow-float}
+Section \ref{sec:width}, \ref{sec:overflow-int}, and \ref{sec:overflow-float}
 have concluded that \dtshort{} is superior than any other integer data types and
 \dtfloat{} is better than \dtdouble{}. 
 
@@ -1811,57 +1811,21 @@ be faster than a more genetic implementation of 32 columns and 2 \zmm{}
 registers. Benchmark illustrated in Figure \ref{fig:specialization} confirms
 with the expectation. 
 
-% to represent 24 columns 
-% for , the performance of 
-
-% Thus
-% the column size of a matrix is very likely to be between 16 and 24, and the 
-% perform of \pivot{} implementation padded to 24 columns is critical. 
-
-% Since most of the input matrices have less
-% than 20 columns (\ref{sec:presburger}), representing a row with 2 \zmm{} vectors
-% introduces padding waste of at least 12 \dtfloat{}s, but using 3 \ymm{}
-% registers for a row reduces the minimal padding size to 4 \dtfloat{}s. 
-
-% To avoid such padding waste, my implementation \pivot{} function with \dtfloat{}
-% is specialized for 4 different column size, using \ymm{} and \zmm{} registers to
-% represent a row. There are 16 combinations in total:
-
-
 \begin{figure}[H]
     \begin{center}
-        \includegraphics[width=\linewidth]{image/specialize-i16-f32.png}
+        \includegraphics[width=\linewidth]{image/specialize-i16-f32-v2.png}
         % \includegraphics[width=50mm]{image/turtle.png}
     \end{center}
-    \caption{\hl{TODO: write caption}}
+    \caption{All implementations using \zmm{} require padding column size to 32.
+    However, the combination of \dtfloat{} and \ymm{} allows some flexibility
+    in padding size. 
+    In cases where the column size is less than 24, instead of padding to 32, 
+    the column size is padded to 24, and three \ymm{} registers are allocated for each row.
+    This approach has been found to be 15\% faster than its \zmm{} counterpart.}
     \label{fig:specialization}
 \end{figure}
 
-\section{Evaluation}
-\vspace*{-4mm}
-\begin{table}[H]
-\centering
-\begin{tabular}{lllll}
-    1. & \dtfloat{}, column count $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    2. & \dtfloat{}, column count $\leq$ 16 & 2 \ymm{} registers & or & 1 \zmm{} register   \\
-    3. & \dtfloat{}, column count $\leq$ 24 & 3 \ymm{} registers & or & 2 \zmm{} registers   \\
-    4. & \dtfloat{}, column count $\leq$ 32 & 4 \ymm{} registers & or & 2 \zmm{} registers  \\
-    5. & \dtshort{}, column count $\leq$ 8  & 1 \ymm{} register  & or &  1 \zmm{} register   \\
-    6. & \dtshort{}, column count $\leq$ 16 & 1 \ymm{} registers & or & 1 \zmm{} register   \\
-    7. & \dtshort{}, column count $\leq$ 24 & (unimplemented) & or & 1 \zmm{} registers   \\
-    8. & \dtshort{}, column count $\leq$ 32 & (unimplemented) & or & 1 \zmm{} registers  
-    \end{tabular}
-\end{table}
-\vspace*{-8mm}
 
-% It is found that for matrices with small column sizes that fits 
-
-% Figure \ref{small-val-low-dim} shows that 95\% most of the matrices have less 20
-% columns while 75\% of the matrices have more than 18 columns~\cite{FPL1}. Thus
-% the column size of a matrix is very likely to be between 16 and 24, and the 
-% perform of \pivot{} implementation padded to 24 columns is critical. 
-
-% With \dtfloat{}, using 3 \ymm{} instead of 2 \zmm{} 
 
 % unfortunately \dtfloat{} does not provide a performance advantage over \dtshort{}.
 % Specifically, \dtfloat{} takes 26 ns, while \dtshort{} completes 6 ns ahead.
@@ -1873,26 +1837,28 @@ with the expectation.
 
 \chapter{Conclusion and Future work}
 
-\dthalf{} is a 16-bit floating point data structure, consistent of 1-bit sign,
-5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). 
-% The \dthalf{}i{}
-% data type can be defined accordingly, and overflow would not occure for xx\% of
-% the cases. 
+\dthalf{} is a 16-bit floating point data structure, consisting of 1-bit sign,
+5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI
+applications where high precision is not needed, \dthalf{} provides performance
+benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}.
 
-Now \dthalf{} has already been supported widely on GPUs for AI applications. It
-provides performance benefits over higher precision floating point formats, for
-the exact same reason that extra precisions are a waste of resources, and more
-number can be computed once with a a shorter data type. If 16-bit floating point
-is integrated into future \texttt{AVX} extensions, it would further improve the
-performance of \pivot{}. It is expected to be slightly slower then the \dtshort{}
-overflow-ignored version, and the runtime can be reduced to about 50\% comparing
-to the \pivot{} function implemented using \dtfloat{} in this report.
+16-bit floating point has been supported natively on GPUs since
+2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future
+\texttt{AVX} extensions, it would potentially further improve the performance of
+\pivot{}. The \dthalfi{} data type can be defined using the 10-bit mantissa, and
+it covers 99\% of the elements in the constraint matrices~\cite{FPL1}. It is
+expected to improve the the runtime of the \pivot{} function by 2 times, if
+\dtfloati{} is replaced with \dthalfi{}.
 
-\begin{figure}
+%  overflow-ignored version, and the runtime
+% can be reduced to about 50\% comparing to the \pivot{} function implemented
+% using \dtfloat{} in this report.
+
+\begin{figure}[H]
     \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/ieee-f16.png}
     \end{center}
-    \caption{IEEE 754 half precision floating point (16 bits).~\cite{ieee754-diagram}}
+    \caption{IEEE 754 half precision floating point (16 bits)~\cite{fp16-diagram}.}
     \label{fig:ieee-f16}
 \end{figure}
 
