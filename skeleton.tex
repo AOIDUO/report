@@ -156,12 +156,12 @@ from the Informatics Research Ethics committee.
 
     I am also grateful to Tobias's Ph.D. students, Arjun Pitchanathan
     and Sasha Lopoukhine. Arjun's assistance have been instrumental
-    in the progress of this project. I would like to extend special thanks to
+    in the progress of this project. I want to extend special thanks to
     Sasha for generously granting me access to the powerful 7950x workstation.
     
-    Finally I would like to express my heartfelt appreciation to all my friends
+    Finally, I would like to express my heartfelt appreciation to all my friends
     who have been a constant source of encouragement and motivation. A special
-    mention goes to Emanon42, lyzh, gjz101, and Marisa Kirisame, whose
+    mention goes to Emanon42, lyzh, gjz010, and Marisa Kirisame, whose
     camaraderie and support have made this journey enjoyable and memorable.
 
 \end{acknowledgements}
@@ -369,8 +369,7 @@ constraints at the same time. The matrix goes through a sequence of
 transformations, until the solution appears or the solution is not feasible. The
 transformations are called ``pivot'', and it solves the linear equation at the pivot
 row for the variable at the pivot column: 
-\vspace*{-4mm}
-\begin{table}[H]
+cccc\begin{table}[H]
 \begin{center}
 \begin{tabular}{llll}
 Pivot item           & $\alpha$ & $\rightarrow$ & $\frac{1}{\alpha}$            \\
@@ -1833,23 +1832,40 @@ with the expectation.
 % over \dtshort{} for vast amount of non-\texttt{AVX-512} platforms. 
 
 
-\chapter{Conclusion and Future work}
+\chapter{Conclusion and Future Work}
 
-In conclusion, this report presents a fast 
+In conclusion, this report presents a fast implementation of the \pivot{}
+function using \dtfloat{}, to address performance bottlenecks when MLIR analysis
+programs using linear programming of simplex method. The procedures are: 
+\vspace*{-2.2mm}
+\begin{compactlist}
+    \item Write source code using Clang's vector type extension to guarantee
+    vectorization.
+    \item Reduce the bit width of each element in the input matrix. High
+    precision data types are unnecessary for \pivot{}.
+    \item Perform integer arithmetics with FPU to leverage floating point's
+    automatic overflow detection.
+\end{compactlist}
+
+I achieved 20 times speedup over the upstream implementation, but unfortunately
+it is about 20\% slower than the FPL's approach. Nevertheless, my method is
+superior in terms of compatibility. The FPL's approach requires
+\texttt{AVX-512}, but mine works on old and vastly more common \texttt{AVX-2}
+CPUs.
 
 
-
-
-\dthalf{} is a 16-bit floating point data structure, consisting of 1-bit sign,
-5-bit exponent and 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI
-applications where high precision is not needed, \dthalf{} provides performance
-benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}. It has been supported
-natively on GPUs since 2016~\cite{pascal-intro-fp16}, and if this data type is
-integrated into future \texttt{AVX} extensions, it would potentially further
-improve the performance of \pivot{}. The \dthalfi{} data type can be defined
-using the 10-bit mantissa, and it covers 99\% of the elements in the constraint
-matrices~\cite{FPL1}. It is expected to improve the the runtime of the \pivot{}
-function by 2 times, if \dtfloati{} is replaced with \dthalfi{}.
+My techniques of optimizing the \texttt{pivot} function could make further
+progress with the 16-bit floating point data structure \dthalf{}. It consists of
+a 1-bit sign, a 5-bit exponent and a 10-bit mantissa (Figure
+\ref{fig:ieee-f16}). For some AI applications where high precision is not
+needed, \dthalf{} provides performance benefits over \dtfloat{} and
+\dtdouble{}~\cite{fp16-fast}. It has been supported natively on GPUs since
+2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future
+\texttt{AVX} extensions, it would potentially further improve the performance of
+\pivot{}. The \dthalfi{} data type can be defined using the 10-bit mantissa, and
+it covers 99\% of the elements in the constraint matrices~\cite{FPL1}. It is
+expected to improve the the runtime of the \pivot{} function by 2 times, if
+\dtfloati{} is replaced with \dthalfi{}.
 
 %  overflow-ignored version, and the runtime
 % can be reduced to about 50\% comparing to the \pivot{} function implemented
