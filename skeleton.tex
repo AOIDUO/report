@@ -107,23 +107,26 @@ This report presents a fast implementation of the core function \pivot{} for a
 math library in MLIR by performing vectorized integer arithmetics in
 FPU. The hot loop of the \pivot{} function performs overflow-checked
 multiplication and addition on each element of an input matrix of low dimension
-and mostly small value items. MLIR's upstream uses element-wise
-transprecision, from \dtlong{} to \texttt{LargeInteger}. 
-This can be improved if hardware resources are utilized effectively, by taking
-advantage of SIMD, and reducing the bit width for every element. 
-The current approach cannot be automatically vectorized by compilers,
+and mostly small-value items. MLIR's upstream uses element-wise
+transprecision computing, where the data type of each element starts with 
+\dtlong{}, and will be switched to \texttt{LargeInteger} in case of overflow. 
+This approach cannot be automatically vectorized by compilers,
 and \dtlong{} has a much larger bit width than what is
 typically needed for most of the items in the matrix.
 Additionally, extra arithmetics are required to perform overflow checking 
-for integers, resulting in significant overhead. 
-This report introduces the
-\dtfloati{}
+for integers, resulting in significant overhead.
+These issues can be addressed by taking
+advantage of SIMD, and reducing the bit width for every element. 
+This report also introduces the \dtfloati{}
 data type, a 23-bit integer data type created from the 23-bit mantissa of a
-32-bit floating point, to address these issues. 
+32-bit floating point.
 \dtfloati{} overflow can be captured as floating point imprecision by a
 status register, making overflow awareness almost free.  
 On a selected 30-row by 19-column representative input matrix, the runtime is
 reduced from 550 ns to 26 ns, achieving 20 times speedup.
+
+% This can be improved if hardware resources are utilized effectively, by taking
+% advantage of SIMD, and reducing the bit width for every element. 
 
 }
 
@@ -534,7 +537,7 @@ decreased together with \texttt{AVX-512} instructions, causing many workloads
 could run faster with disabled \texttt{AVX-512} and higher clock
 frequency~\cite{Zen4Critique}. 
 
-\hlc[pink]{OptionalTODO: alderlake disabled avx-512 for big.LITTLE}
+% \hlc[pink]{OptionalTODO: alderlake disabled avx-512 for big.LITTLE}
 
 
 % \subsection{AMD}
@@ -1522,8 +1525,8 @@ anticipated arithmetic results, while overflow information are provided by
   \label{table:i16-instr}
 \end{table}
 \end{center}
-\subsubsection{Implementation of scalar \dtint{} and \dtlong{}
-overflow checking} 
+\subsubsection{Implementation of Scalar \dtint{} and \dtlong{}
+Overflow Checking} 
 
 \hl{TODO:Not sure if this section is necessary or not?}
 
