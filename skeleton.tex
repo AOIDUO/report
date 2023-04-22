@@ -15,6 +15,7 @@
 \usepackage{relsize}
 \usepackage{float}
 \usepackage[hidelinks]{hyperref}
+\usepackage{tikz}
 
 \newcommand{\sigfpe}{\texttt{SIGFPE}}
 \newcommand{\dthalfi}{\texttt{int10\char`_t}}
@@ -72,8 +73,8 @@
 \begin{document}
 \begin{preliminary}
 
-\title{Fast \pivot{} Function for Presburger Library Through Vectorization and
-Integer Arithmetic in FPU}
+\title{Fast \pivot{} Function for MLIR's Presburger Library Through
+Vectorization and Integer Arithmetic in FPU}
 
 \author{Zhou Qi}
 
@@ -177,12 +178,17 @@ from the Informatics Research Ethics committee.
 MLIR, Multi-Level Intermediate Representation, is an infrastructure for building
 reusable and extensible compilers. It aims to reduce fragmentation in domain-specific
 languages and heterogeneous hardware~\cite{mlir}. Its Presburger
-library provides polyhedral compilation techniques for dependence analysis
-and loop optimization~\cite{mliraffine} and cache modeling~\cite{CacheModel}.
-Presburger arithmetics involves determining whether the conjunction of linear
-arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
+library provides polyhedral compilation techniques for dependence analysis,
+loop optimization~\cite{mliraffine}, and cache modeling~\cite{CacheModel}.
+Presburger arithmetics involves determining whether a linear problem is 
+satisfiable under its constraints~\cite{SMLPPA}, and can be solved using the
 simplex method of linear programming, with its core function \pivot{} is the
 main performance bottleneck~\cite{FPL1}. 
+% Presburger arithmetics involves determining whether the conjunction of linear
+% arithmetic constraints is satisfiable~\cite{SMLPPA}, and can be solved using the
+% simplex method of linear programming, with its core function \pivot{} is the
+% main performance bottleneck~\cite{FPL1}. 
+
 
 The \texttt{pivot} function involves two multiplication and one addition
 operation on every element in a matrix. Notably, the input matrices for this
@@ -223,13 +229,14 @@ performance improvement.
 
 \item Use small bit width for every element: reducing the bit width by half
 doubles the amount of elements packed into a single vector register, and
-essentially reduces the instruction count by half (See Table \ref{archtable}). 
+essentially reduces the instruction count by half (Table \ref{archtable}). 
 
 \item Fast overflow checking: overflow has to be checked manually for integers,
 which introduces at least 65\% overhead toward total runtime (Section
 \ref{sec:i16-overflow-checking}). This is because the x86 architecture does not
-provide status registers to indicate integer overflow. However, there is one for
-floating points, making floating points overflow detection almost free. 
+provide status registers to indicate vectorized integer overflow. However, there
+is one for floating points, making overflow detection for vector floating point
+operations almost free. 
 
 \end{enumerate}
 
@@ -240,41 +247,57 @@ approach offers the advantage of being able to pack a row of 32 elements into a
 single AVX-512 register and addresses issues 1 and 2. However, overflow
 is still checked manually, causing 4 times more instruction count (Section
 \ref{sec:i16-overflow-checking}). Additionally, this approach introduces a new
-disadvantage. The AVX-512 extension is required for CPUs to support
+drawback. The AVX-512 extension is required for CPUs to support
 vectorized \dtshort{}, and this is very rare among CPUs manufactured in the last
 decade (Section \ref{sec:avx512}). 
 
-An alternative approach is to do 23-bit or 52-bit integer operations using float
-(32-bit floating point) or double (64-bit floating point), respectively. Though
+An alternative approach is to do 24-bit or 53-bit integer operations using float
+(32-bit floating point) or double (64-bit floating point)\footnote{ IEEE 754 specification is introduced in Section
+\ref{sec:IEEE754}}. 
+Though
 floating points are notorious for precision issues, they are reliable when
-representing integers that fit inside their mantissa, 23 bits for float and 52
-bits for double \footnote{ IEEE 754 specification is introduced in Section
-\ref{sec:IEEE754}}. When the result of some integer computation exceeds the bit
-size of the mantissa, floating point imprecision almost always occurs, and a
-status register will be set automatically (Section \ref{sec:overflow-float}).
-Comparing to \dtshort{}, even though vector size is sacrificed as there does not
-exist support for 16-bit floating point \texttt{half}, using floating points
-could still potentially be faster, because overflow checking overhead can be
-significantly reduced. The cost of overflow checking for floating points is the
-time spent on resetting the status register once at the beginning of a sequence
-of calls to \pivot{}~\cite{FPL1}, plus reading it in each \pivot{} call. Even
-though reading the register takes 5 ns and resetting it costs 10.5 ns (Figure
-\ref{plot_fenv}), the effective total overhead can be less than 1 ns. The
-average cost of resetting per \pivot{} can be treated as negligible, while the
-superscalar and out-of-order execution pipeline hides the latency of reading the
-status register. Moreover, floating points offer better compatibility with old
-computers than \dtshort{}. Vector \dtfloat{} or \dtdouble{} code can be executed
-on CPUs with AVX-2, the predecessor of AVX-512. Almost every
-x86 CPU from the last decade supports AVX-2. 
+representing integers that fit inside their mantissa. 
+% The bit width of 
+% precise integer is up to 24 bits for float and 53
+% bits for double
+Here, ``overflow'' can be defined as imprecision, rather than a restriction on 
+bit width. 
+When the result of some integer computation exceeds the bit
+size of the mantissa, floating point imprecision almost always occurs and a
+status register will be set automatically. Occasionally, imprecision does not
+happen due to floating point normalization, and this is not considered as
+overflow.
+(Section \ref{sec:overflow-float}).
+
+Comparing to \dtshort{}, since the overflow checking overhead can be
+significantly reduced, using floating points could potentially be faster.
+However it comes with the cost of larger bit width and smaller vector size, as
+there does not exist support for 16-bit floating point \texttt{half}. The cost
+of overflow checking for floating points is the time spent on resetting the
+status register once at the beginning of a sequence of calls to
+\pivot{}~\cite{FPL1}, plus reading it in each \pivot{} call. Even though reading
+the register takes 5 ns and resetting it costs 10.5 ns (Figure \ref{plot_fenv}),
+the effective total overhead can be less than 1 ns through optimization (Figure
+\ref{fig:specialization}). The superscalar and out-of-order execution pipeline
+hides the latency of reading the status register. Also, the \pivot{} function is
+often invoked repeatedly in a sequence \cite{FPL1}, making the cost of resetting
+the status register negligible for each single call. 
+
+
+
+Another advantage of \dtfloat{} over \dtint{} is that floating points offer
+better compatibility with old computers. Vectorized \dtfloat{} implementation of
+\pivot{} runs fine with AVX-2, it does not require new features from the AVX-512
+extension. Thus it is possible to be executed on almost every x86 CPU from the
+last decade. 
 % It can also be adapted to
 % fit even older \texttt{AVX-128} and SSE CPUs with slight change in the
 % source code.
 
 This report will first analyze the capability of modern CPU micro-architecture,
-especially \texttt{Zen 4}, through a matrix element-wise fused-multiply-add toy
+especially Zen 4, through a matrix element-wise fused-multiply-add toy
 example under the various configurations regarding vectorization methods, matrix
 data structures, element data types, and data widths (Section \ref{sec:Toy}). 
-
 It is discovered that optimal performance can be achieved by selecting Clang
 vector type extension as the vectorization methods, and using a flat list as the
 matrix data structure. However, it is quite difficult to decide whether
@@ -678,7 +701,7 @@ not break the mechanism of representing integers in floating points.
 % \hl{TODO: place this paragraph here?}
 
 
-\begin{figure}
+\begin{figure}[H]
 \begin{center}
     \includegraphics[width=50mm,scale=0.1]{image/0.3004.jpg}
     \caption{A floating point meme: \texttt{0.1 + 0.2 =
@@ -1569,7 +1592,7 @@ of \sigfpe{} is to do some cleanup in the handler function, then exit the progra
 gracefully. If the handler does not exit the program after returning from the
 handler, the PC always points back to the instruction that caused \sigfpe{} and
 triggers \sigfpe{} again! However, the goal is to discard the current progress and
-continue the program using the LargeInteger algorithm. Although there could
+continue the program using the \texttt{LargeInteger}  algorithm. Although there could
 be potential workarounds, such as modifying the call stack and changing the
 return address, implementing these solutions can be challenging and
 introduce significant complexity to the codebase.
@@ -1700,19 +1723,34 @@ many aspects, for example, the number of memory load operations. In the actual
 
 \section{Matrix-wise Transprecision}
 Transprecision computing can be implemented at different levels of scale, such
-as element-wise, row-wise, and matrix-wise. The vectorized versions of \pivot{}
-are implemented using the matrix-wise transprecision style. 
+as element-wise, row-wise, and matrix-wise (Figure
+\ref{fig:transprecision-dispatch}). The transprecision dispatcher examining
+overflow after computing on each element, each row or the entire matrix. If an
+overflow occurs, the dispatcher interrupts its current progress, copies the 
+matrix to fit a wider data type inside, then restarts dispatching using the wider
+data type. 
 
+\begin{figure}[H]
+\begin{center}
+    \includegraphics[width=\linewidth]{image/transprecision-dispatch.png}
+    \caption{This figure illustrates how transprecision computing is organized
+    from the perspective of the dispatcher. From row-wise to matrix-wise 
+    transprecision, the cost of dispatching decreases \cite{FPL1}.}
+    \label{fig:transprecision-dispatch}
+\end{center}
+\end{figure}
 % For \dtfloat{}, the
 % \mxcsr{} register accumulates information regarding previous overflow and
 % imprecision occurrences until it is cleared manually. 
 
-The element-wise method is unsuitable in this scenario, as it defeats the
-purpose of vectorization. The row-wise method is not chosen either, due to that
-overflow is not likely to occur, and the matrix is small. Reading the \mxcsr{}
-can be considered as an expensive operation compared to the time spent on
-pivoting through the entire matrix. Avoid wasting arithmetic instructions
-after overflowing at the cost of more \mxcsr{} reads is not a cost-effective
+The \pivot{} function presented by this report is implemented using the
+matrix-wise transprecision style, in order to minimize the runtime spent in the
+dispatcher. The element-wise method is unsuitable in this scenario, as it
+defeats the purpose of vectorization. The row-wise method is not chosen either,
+due to that overflow is not likely to occur, and the matrix is small. Reading
+the \mxcsr{} can be considered as an expensive operation compared to the time
+spent on pivoting through the entire matrix. Avoid wasting runtime after
+overflown at the cost of more \mxcsr{} reads is not a cost-effective
 trade-off.
 
 Even though the \pivot{} function using \dtshort{} was implemented using the
@@ -1726,21 +1764,39 @@ overflow flag.
 
 \section{Double Buffering}
 
-Double buffering is a powerful technique to resolve the issue of data pollution
-caused by overflown data. When matrix-wise computing is carried out, a potential
-overflow can contaminate the input matrix and write meaningless results into it.
-It is difficult to recover from overflown results, making it impossible to
-dispatch the same input matrix to an algorithm of higher precision and defeating
-the purpose of transprecision computing.
+When matrix-wise computing is carried out, a potential overflow can contaminate
+the input matrix and write meaningless results into it. It is difficult to
+recover from overflown results, making it impossible to redispatch the same
+input matrix to an algorithm of higher precision and defeating the purpose of
+transprecision computing.
 
-Double buffering addresses this problem by allocating two pieces of
+Double buffering (Figure \ref{fig:double-buffering}) 
+addresses this problem of data pollution
+caused by overflown data by allocating two pieces of
 memory, one for the input matrix and the other for the output matrix. The input
 matrix is read-only, while the output matrix allows read and write.
 This separation of data storage ensures that the input matrix remains unpolluted
 by overflown data and that any potential overflow is encapsulated within the
 separate output matrix. 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm]
+    \node (buffer1) [rectangle, draw, minimum width=3cm, minimum height=2.5cm ] {Input Matrix};
+    \node (compute) [rectangle, draw, text width=2.4cm, align=center, minimum width=1cm, minimum height=1cm, right of=buffer1, xshift=2.5cm] {\pivot{}\\Arithmetics};
+    \node (buffer2) [rectangle, draw, minimum width=3cm, minimum height=2.5cm, right of=compute, xshift=2.5cm] {Output Matrix};
 
-While making a copy of the input matrix is a simple and easy solution for
+    \draw [->] (buffer1) -- node[above] {Load} (compute);
+    \draw [->] (compute) -- node[above] {Store} (buffer2);
+\end{tikzpicture}
+\caption{The dataflow of the double buffered \pivot{}
+function. Data is loaded from the input matrix, and stored to the output
+matrix after computing.}
+\label{fig:double-buffering}
+\end{figure}
+
+
+While making a copy of the input matrix (Figure \ref{fig:single-buffering}) 
+is a simple and easy solution for
 protecting the original data from pollution, double buffering is a superior
 technique because it does not introduce additional memory operations. With
 double buffering, every operand needs a load operation from the input matrix,
@@ -1748,30 +1804,66 @@ and every result takes a store operation to be written into the output matrix.
 This is the minimal amount of memory operation required for arithmetics. Zen 4
 can load one \zmm{} vector per cycle and store one \zmm{} vector per two
 cycles. In comparison, it can do two multiplication or addition of \zmm{}
-vectors every cycle. The discrepancy in throughput between computing and IO
+vectors every cycle~\cite{Zen4Critique}. The discrepancy in throughput between computing and IO
 suggests that memory copy is very expensive and inefficient. 
-
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm]
+    \node (buffer1) [rectangle, draw, minimum width=3cm, minimum height=2.5cm ] {Input Matrix};
+    \node (buffer2) [rectangle, draw, minimum width=3cm, minimum height=2.5cm, right of=buffer1, xshift=3cm] {Backup Matrix};
+    \draw [->] (buffer1) -- node[above] {Copy} (buffer2);
+    
+    \node (compute) [rectangle, draw, text width=2.4cm, align=center, minimum width=1cm, minimum height=1cm, below of=buffer1, yshift=-1cm] {\pivot{}\\Arithmetics};
+    \draw [->] ([xshift=2cm]buffer1) -- node[left] {Load \phantom{11}} (compute);
+    \draw [<-] ([xshift=-2cm]buffer1) -- node[right] {\phantom{51} Store} (compute);
+\end{tikzpicture}
+\caption{The dataflow of the \pivot{} function if it creates a
+backup of the input matrix rather than double buffering. Comparing to 
+Figure \ref{fig:double-buffering}, 
+this method requires additional memory copy operations to make a backup.}
+\label{fig:single-buffering}
+\end{figure}
 \section{Alignment}
-In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
-assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. 
-\texttt{vmovups} for
-``Move Unaligned Packed Single-Precision Floating-Point Values''~\cite{instruction},
-and \texttt{instruction} for 
-``Move Unaligned Packed Integer Values''~\cite{instruction}. 
 
-An unaligned load may bring potential negative impacts on performance. When
-accessing memory, the CPU retrieves data from the main memory or cache in units
-of cache lines. On Zen 4, the size of a cache line is 512 bits, precisely the
-size of a \zmm{} register \cite{AMDManual}. Alignment guarantees that a single
-cache line can cover a vector register. Otherwise, a \zmm{} register might be
-spitted on two cache lines. Both cache lines of 1028 bits have to be requested
-from the memory, then performs a shift to extract the desired 512
-bits~\cite{Unaligned}.  
+
+The concept of memory alignment ensures that 
+the starting address of each piece of data is a multiple of its size. 
+When accessing memory, the CPU retrieves data
+from the main memory or cache in the unit of ``cache line'', and the cache lines
+are aligned. 
+% On Zen 4, the size of a
+% cache line is 512 bits, precisely the size of a \zmm{}
+% register~\cite{AMDManual}. 
+Aligning the matrix to the size of vector registers
+guarantees that every vector is fitted inside a single cache line.
+Otherwise, a vector register might be spitted on two cache lines, then the CPU
+have to request both cache lines and performs a shift to
+extract the desired vector~\cite{Unaligned}.  
+
+In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
+assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}.
+\texttt{vmovups} for ``Move Unaligned Packed Single-Precision Floating-Point
+Values'', and \texttt{vmovdqu64} for ``Move Unaligned Packed Integer
+Values''~\cite{instruction}. This indicates that the load operation are unaligned,
+and may bring negative impacts on performances~\cite{Unaligned}. 
+
 
 To address this issue, an aligned allocator is given to the constructor of\linebreak
-\texttt{std::vector} when initializing a matrix~\cite{FPL2}. Loading from an
-aligned address can be noticed by the compiler, then aligned load instructions
-\texttt{vmovdqa} or \texttt{vmovaps} will be issued accordingly. 
+\texttt{std::vector} when creating a matrix as follow, where the
+\texttt{AlignedAllocator} is provided by the \dtshort{} implementation from the
+FPL paper~\cite{FPL2}:
+\begin{VerbatimCompact}
+template <typename T>
+class matrix {
+public:
+  std::vector<T, AlignedAllocator<T, 64>> m;
+  // ...
+}
+\end{VerbatimCompact}
+
+Loading from an aligned address can be noticed by the compiler, then aligned
+load instructions \texttt{vmovdqa} or \texttt{vmovaps} will be selected
+accordingly. 
 
 \section{Reduce Number of Matrix Index Computation}
 \label{sec:optmz-get-index}
