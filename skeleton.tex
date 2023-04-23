@@ -24,9 +24,9 @@
 \newcommand{\dtlong}{\texttt{int64\char`_t}}
 \newcommand{\dthalf}{\texttt{half}}
 \newcommand{\dtfloat}{\texttt{float}}
-\newcommand{\dtfloati}{\texttt{int23\char`_t}}
+\newcommand{\dtfloati}{\texttt{int24\char`_t}}
 \newcommand{\dtdouble}{\texttt{double}}
-\newcommand{\dtdoublei}{\texttt{int52\char`_t}}
+\newcommand{\dtdoublei}{\texttt{int53\char`_t}}
 \newcommand{\feinexact}{\texttt{FE\char`_INEXACT}}
 \newcommand{\feinvalid}{\texttt{FE\char`_INVALID}}
 \newcommand{\mxcsr}{\texttt{mxcsr}}
@@ -119,7 +119,7 @@ for integers, resulting in significant overhead.
 These issues can be addressed by taking
 advantage of SIMD, and reducing the bit width for every element. 
 This report also introduces the \dtfloati{}
-data type, a 23-bit integer data type created from the 23-bit mantissa of a
+data type, a 24-bit integer data type created from the sign bit plus the 23-bit mantissa of a
 32-bit floating point.
 \dtfloati{} overflow can be captured as floating point imprecision by a
 status register, making overflow awareness almost free.  
@@ -200,11 +200,11 @@ properties can be leveraged to utilize modern micro-architectural
 hardware resources, thereby accelerating the process.
 
 Currently, the source code in MLIR upstream adopts a nested for-loop to iterate
-through every matrix element in a transprecision manner. Each element in
-the matrix can either be \dtlong{} or \texttt{LargeInteger} and the
-algorithm starts by using \dtlong{}. In case of overflow, it switches to
-the \texttt{LargeInteger} version. This approach is computationally expensive
-and inefficient, for the following reasons: 
+through every matrix element in a transprecision manner. Each element in the
+matrix can either be \dtlong{} or \texttt{LargeInteger} and the algorithm starts
+by using \dtlong{}. In case of overflow, the algorithm is redispatched with
+\texttt{LargeInteger}. This approach is computationally expensive and
+inefficient, for the following reasons: 
 \begin{enumerate}
 
 \item \dtlong{} has a much larger bit width than what is typically
@@ -489,13 +489,13 @@ overflow, as illustrated in Figure \ref{fig:fpl_arch}. Unfortunately the
 MLIR upstream only presents a 2-layer transprecision, consisting of element-wise
 scalar operation using \dtlong{} and \texttt{LargeInteger}. The \dtshort{}
 version is not merged with the upstream for two reasons: 
-\begin{compactlist} 
+\begin{enumerate} 
     \item \dtshort{} vectors require AVX-512 ISA extension, but hardware
     support is rare (Section \ref{sec:avx512}). 
     \item Despite the \dtshort{} version being fast, overflow checking overhead
     is 65\%~\cite{FPL2}. Using floating points could significantly reduce this
     overhead and potentially be faster (Section \ref{sec:i23}).  
-\end{compactlist}
+\end{enumerate}
 
 
 \begin{figure}
@@ -658,11 +658,11 @@ arithmetic, for example, modular exponentiation and RSA
 algorithms~\cite{intfpu-modexp}, because often the architecture of GPU prioritizes
 the performance of floating points rather than integers. 
 
-Given that the mantissa part of a float consists of 23 bits,
-inexactness never occurs when representing integers less than 23 bits (ignoring
-the sign bit). Furthermore, in case of an integer overflow, floating point
+Given that the mantissa part of a float consists of 23 bits, together with the sign bit,
+inexactness never occurs when representing integers less than 24 bits. 
+Furthermore, in case of an integer overflow, floating point
 imprecision almost always occurs, and setting a corresponding status register.
-The same concept applies to double data types, which have a mantissa consisting
+The same concept applies to double data types, which have a mantissa 
 of 52 bits.
 
 This mechanism is reliable, as floating-point inexactness always implies 
@@ -2084,15 +2084,15 @@ It is discovered from that:
 In conclusion, this report presents a fast implementation of the \pivot{}
 function using \dtfloat{} to address performance bottlenecks when MLIR analysis
 programs using linear programming of the simplex method. The procedures are: 
-\vspace*{-2.2mm}
-\begin{compactlist}
+% \vspace*{-2.2mm}
+\begin{enumerate}
     \item Write source code using Clang's vector type extension to guarantee
     vectorization.
     \item Reduce the bit width of each element in the input matrix.
     High-precision data types are unnecessary for \pivot{}.
     \item Perform integer arithmetics with FPU to leverage floating point's
     automatic overflow detection.
-\end{compactlist}
+\end{enumerate}
 
 I achieved 20 times speedup over the upstream implementation, but unfortunately,
 it is about 20\% slower than the FPL's approach. Nevertheless, my method offers
@@ -2129,9 +2129,17 @@ function by 2 times if \dtfloati{} is replaced with \dthalfi{}.
 \chapter{Related Work}
 \begin{enumerate}
     % \item mlir
-    \item ISL
-    \item fpl
-    \item cache modeling paper
+    % \item ISL
+    % \item fpl
+    % \item presburger
+    
+    \item \textbf{Fast Analytical Model of Caches}~\cite{CacheModel}: This paper
+    proposes a fast approach to model fully associative and LRU cache. It is
+    orders-of-magnitude faster than the analytical model haystack or the
+    simulator dinero IV. They count cache miss using the symbolic counting
+    technique, rather than enumeration of all memory accesses. It was discovered
+    that the symbolic counting are sufficiently linear in practice, and can be
+    solved using presburger arithmetics.
     
     \item \textbf{Fast Modular Exponentiation using Floating Point Arithmetic in
     GPU}~\cite{intfpu-modexp}: Modular exponentiation is critical to RSA
@@ -2141,10 +2149,10 @@ function by 2 times if \dtfloati{} is replaced with \dthalfi{}.
     exponentiation using double precision floating points, and achieved 20\% to
     34\% speed up over the best prior implementation.
     
-    \item \textbf{Transprecision Training Using \dthalf{} and
+    \item \textbf{Mixed-precision Training Using \dthalf{} and
     \dtfloat{}}~\cite{fp16-fast}: Performance and memory efficiency of deep
     learning models can be improved by starting with low precision \dthalf{}
-    arithmetics, and switch to \dtfloat{} if high precision is required. NVIDIA
+    arithmetics, and transit to \dtfloat{} if high precision is required. NVIDIA
     advertises 8 times more \dthalf{} arithmetic throughput when compared
     to \dtfloat{}, and this translates into 2 to 4.5 times speedup 
     for transprecision models.
