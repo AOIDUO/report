@@ -654,8 +654,8 @@ likely to be imprecise, and are often illustrated in popular memes as shown in
 Figure \ref{meme}~\cite{meme}. However, when storing integer values inside
 floating points, floating points can be pretty reliable. Historically
 floating point processing units in GPUs have been utilized for fast integer
-arithmetic, for example, modular exponentiation \cite{intfpu-modexp} and RSA
-algorithms~\cite{intfpu-rsa}, because often the architecture of GPU prioritizes
+arithmetic, for example, modular exponentiation and RSA
+algorithms~\cite{intfpu-modexp}, because often the architecture of GPU prioritizes
 the performance of floating points rather than integers. 
 
 Given that the mantissa part of a float consists of 23 bits,
@@ -2030,10 +2030,22 @@ faster then the 2 \zmm{} configuration, which matches the expectation.
 \begin{figure}[H]
     \begin{center}
         \includegraphics[width=\linewidth]{image/i16-3ymmf32-upstream-overflow.png}
-        % \includegraphics[width=50mm]{image/turtle.png}
     \end{center}
     \caption{ 114514
     }
+
+    \label{fig:i16-3ymmf32-upstream-overflow}
+\end{figure}
+
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=\linewidth]{image/i16-3ymmf32-upstream-table.png}
+    \end{center}
+    \caption{ 114514
+    }
+    \label{fig:i16-3ymmf32-upstream-table}
+\end{figure}
+
     % \caption{ A benchmark of the \pivot{} function.
     % All implementations using \zmm{} require padding column size to 32.
     % However, the combination of \dtfloat{} and \ymm{} allows some flexibility
@@ -2042,12 +2054,7 @@ faster then the 2 \zmm{} configuration, which matches the expectation.
     % the column size is padded to 24, and three \ymm{} registers are allocated for each row.
     % This approach has been found to be 15\% faster than its \zmm{} counterpart.
     % }
-    \label{fig:i16-3ymmf32-upstream-overflow}
-\end{figure}
-
-
-By integrating the aforementioned optimizations and running a benchmark (Figure
-\ref{fig:specialization}) for the \pivot{} function, it is discovered that:
+It is discovered from that:
 \begin{enumerate}
     \item The \dtshort{} approach from FPL~\cite{FPL2} costs 20 ns, this is 6 ns
     faster than the \dtfloat{} approach proposed by this report. A possible
@@ -2070,15 +2077,7 @@ By integrating the aforementioned optimizations and running a benchmark (Figure
 % Additionally, \dtfloat{} offers substantial compatibility advantage
 % over \dtshort{} for vast amount of non-AVX-512 platforms. 
 
-\chapter{Related Work}
-\begin{enumerate}
-    \item mlir
-    \item ISL
-    \item fpl
-    \item cache modeling paper
-    \item floating point GPU arithmetic papers 1
-    \item floating point GPU arithmetic papers 2
-\end{enumerate}
+
 
 \chapter{Conclusion and Future Work}
 
@@ -2096,14 +2095,13 @@ programs using linear programming of the simplex method. The procedures are:
 \end{compactlist}
 
 I achieved 20 times speedup over the upstream implementation, but unfortunately,
-it is about 20\% slower than the FPL's approach. Nevertheless, my method is
-superior in terms of compatibility. The FPL's approach requires
-AVX-512, but mine works on old and vastly more common AVX-2
-CPUs.
+it is about 20\% slower than the FPL's approach. Nevertheless, my method offers
+better compatibility. The FPL's approach requires AVX-512, but mine works on old
+and vastly more common AVX-2 CPUs.
 
 
 My techniques of optimizing the \texttt{pivot} function could make further
-progress with the 16-bit floating point data structure \dthalf{}. It consists of
+progress with the 16-bit floating point data type \dthalf{}. It consists of
 a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa (Figure
 \ref{fig:ieee-f16}). For some AI applications where high precision is not
 needed, \dthalf{} provides performance benefits over \dtfloat{} and
@@ -2127,6 +2125,30 @@ function by 2 times if \dtfloati{} is replaced with \dthalfi{}.
     \label{fig:ieee-f16}
 \end{figure}
 
+
+\chapter{Related Work}
+\begin{enumerate}
+    % \item mlir
+    \item ISL
+    \item fpl
+    \item cache modeling paper
+    
+    \item \textbf{Fast Modular Exponentiation using Floating Point Arithmetic in
+    GPU}~\cite{intfpu-modexp}: Modular exponentiation is critical to RSA
+    cryptographic operations. It is the calculation of the remainder $r$ when an
+    integer $b$ is raised to the power of $e$, then divided by the modulus $m$:
+    $r = b ^ e$ mod $m$. The paper presents an approach of computing modular
+    exponentiation using double precision floating points, and achieved 20\% to
+    34\% speed up over the best prior implementation.
+    
+    \item \textbf{Transprecision Training Using \dthalf{} and
+    \dtfloat{}}~\cite{fp16-fast}: Performance and memory efficiency of deep
+    learning models can be improved by starting with low precision \dthalf{}
+    arithmetics, and switch to \dtfloat{} if high precision is required. NVIDIA
+    advertises 8 times more \dthalf{} arithmetic throughput when compared
+    to \dtfloat{}, and this translates into 2 to 4.5 times speedup 
+    for transprecision models.
+\end{enumerate}
 
 % \section{Final Reminder}
 
