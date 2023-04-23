@@ -306,20 +306,9 @@ vector size and less instruction count, while the latter has a minimal overhead
 on overflow checking. 
 
 Then two detached versions of \texttt{pivot} function from the Presburger
-library are built from the most optimal configurations derived from the toy
-example, one using \dtshort{} and the other using \dtfloat{}. Some
-further optimizations were made by inspecting \texttt{perf} reports and
-assembly, including: 
-
-\begin{compactlist} 
-    \item Implementing matrix-wise transprecision computing 
-    \item Double buffering
-    \item Aligning the matrix to the size of vector registers
-    \item Reducing the number of matrix index computation
-    \item Specialization for different row sizes
-\end{compactlist}
-
-After applying these optimizations, a benchmark is set up for a
+library are built, according to the most optimal configurations from the toy
+example, one using \dtshort{} and the other using \dtfloat{}. After applying 
+further optimizations (Section \ref{sec:pivot-impl}), a benchmark is set up for a
 selected 30-row and 19-column matrix. The achievements are: 
 \begin{enumerate}
     \item The vectorized \dtfloat{} implementation of \pivot{} significantly
@@ -1364,11 +1353,16 @@ Empirically indexing costs more time than integer multiplication and addition,
 thus improving performance. Both the toy example and the \pivot{} function
 perform sequential load-compute-store operations on each row and each column,
 allowing the index of the next element to be computed by simply adding the step
-size or column size, further reducing memory overhead. In fact, the \pivot{}
-function can be optimized to only compute index once (See Section
-\ref{sec:optmz-get-index}) by placing the pivot row as the first row. Benchmark
-(Figure \ref{fig:nested-flat}) on the toy example confirms that when there are
-16 rows, the nested vector matrix is about 8 ns faster than the flat matrix.
+% size or column size, further reducing memory overhead. In fact, 
+% for element-wise matrix operations, such as the toy example or the \pivot{} function,
+% % function can be optimized to only compute index once (See Section
+% % \ref{sec:optmz-get-index}) by placing the pivot row as the first row. 
+% it is only required to
+% compute the address once for the first element of the matrix, and then every
+% subsequent item can be indexed by address increments. 
+Benchmark (Figure \ref{fig:nested-flat}) on the toy example confirms that for
+16-row matrices with 16 column, 32 column or 64 column, the nested vector structure
+is always about 8 ns slower than the flat matrix.
 
 \begin{figure}
     \includegraphics[width=\linewidth]{image/bench_nested_flat.png}
@@ -1720,6 +1714,39 @@ many aspects, for example, the number of memory load operations. In the actual
 
 
 \chapter{Implementation and Optimization of \pivot{}}
+\label{sec:pivot-impl}
+% \section{Overview}
+The previous chapter on the top example have concluded that:
+\begin{enumerate} 
+    \item To achieve vectorization, source code should be written using Clang's
+    vector type extension, rather than relying on compiler's automatic
+    vectorizor. 
+    \item Storing a matrix into a single flat list is more 
+    advantageous than the nested list approach.
+    \item The optimal integer and floating point data type is \dtshort{} and
+    \dtfloat{} respectively. But it is difficult to tell
+    which one is superior, because they have their own distinct advantages.
+    \dtshort{} offers very short bit width, while \dtfloat{} provides quick overflow
+    checking.
+\end{enumerate}
+
+After adopting clang's vector type and the flat list matrix design, this chapter
+introduces some further optimizations to \pivot{} as the list below, and then
+evaluates the performance of \pivot{} using either \dtshort{} or \dtfloat{} data
+type.
+
+\begin{enumerate} 
+    \item Matrix-wise transprecision computing: minimizes the overhead
+    of the transprecision dispatcher
+    \item Double buffering: avoids the matrix being polluted by overflown data
+    while not introduce additional memory copy operations. 
+    \item Aligning the matrix to the size of vector registers: improves memory
+    and cache IO utilization.
+    \item Specialization for different row sizes: for \dtfloat{}, using 3 \ymm{}
+    vectors for a row instead of 2 \zmm{} vectors reduces padding waste for each
+    row and eliminates unnecessary arithmetic instructions.
+\end{enumerate}
+
 
 \section{Matrix-wise Transprecision}
 Transprecision computing can be implemented at different levels of scale, such
@@ -1806,7 +1833,7 @@ can load one \zmm{} vector per cycle and store one \zmm{} vector per two
 cycles. In comparison, it can do two multiplication or addition of \zmm{}
 vectors every cycle~\cite{Zen4Critique}. The discrepancy in throughput between computing and IO
 suggests that memory copy is very expensive and inefficient. 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \begin{tikzpicture}[node distance=2cm]
     \node (buffer1) [rectangle, draw, minimum width=3cm, minimum height=2.5cm ] {Input Matrix};
@@ -1823,22 +1850,26 @@ Figure \ref{fig:double-buffering},
 this method requires additional memory copy operations to make a backup.}
 \label{fig:single-buffering}
 \end{figure}
+
+
 \section{Alignment}
 
 
-The concept of memory alignment ensures that 
-the starting address of each piece of data is a multiple of its size. 
-When accessing memory, the CPU retrieves data
+The concept of memory alignment ensures that the starting address of each piece
+of data is a multiple of its size. When accessing memory, the CPU retrieves data
 from the main memory or cache in the unit of ``cache line'', and the cache lines
-are aligned. 
+are aligned. Aligning the matrix to the size of vector registers guarantees that
+every vector is fitted inside a single cache line. Otherwise, a vector register
+might be spitted on two cache lines, then the CPU have to request both cache
+lines and performs a shift to extract the desired vector~\cite{Unaligned}. A
+simple example is provided by Figure \ref{fig:cacheline}.
+
+
+
+
 % On Zen 4, the size of a
 % cache line is 512 bits, precisely the size of a \zmm{}
 % register~\cite{AMDManual}. 
-Aligning the matrix to the size of vector registers
-guarantees that every vector is fitted inside a single cache line.
-Otherwise, a vector register might be spitted on two cache lines, then the CPU
-have to request both cache lines and performs a shift to
-extract the desired vector~\cite{Unaligned}.  
 
 In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the
 assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}.
@@ -1846,9 +1877,7 @@ assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}.
 Values'', and \texttt{vmovdqu64} for ``Move Unaligned Packed Integer
 Values''~\cite{instruction}. This indicates that the load operation are unaligned,
 and may bring negative impacts on performances~\cite{Unaligned}. 
-
-
-To address this issue, an aligned allocator is given to the constructor of\linebreak
+To address this issue, an aligned allocator is given to the constructor of
 \texttt{std::vector} when creating a matrix as follow, where the
 \texttt{AlignedAllocator} is provided by the \dtshort{} implementation from the
 FPL paper~\cite{FPL2}:
@@ -1860,61 +1889,162 @@ public:
   // ...
 }
 \end{VerbatimCompact}
-
 Loading from an aligned address can be noticed by the compiler, then aligned
 load instructions \texttt{vmovdqa} or \texttt{vmovaps} will be selected
 accordingly. 
 
-\section{Reduce Number of Matrix Index Computation}
-\label{sec:optmz-get-index}
+\begin{figure} [H]
+    \begin{center}
+        \includegraphics[width=\linewidth]{image/cacheline.png}
+    \end{center}
+    \caption{This example highlight the difference between 
+    aligned loads and unaligned loads in the memory. 
+    The vectors \texttt{Vector\char`_A*} are aligned 
+    with the cache line size, loading them involves reading two of their 
+    corresponding cache lines.
+    However, \texttt{Vector\char`_B*}
+    are unaligned, they are spitted on 3 cache lines. All 3 cache lines have to be
+    read when loading the two \texttt{Vector\char`_B*} vectors. 
+    }
+    \label{fig:cacheline}
+\end{figure}
 
-Section \ref{sec:mat-structure} discussed the benefits of using a single
-\texttt{std::vector} to represent a matrix. Given arbitrary row and column, the
-item of the matrix can be found in the array by computing the index:
-\texttt{column count * row + column}. The matrix data structure can be further
-optimized if the number of index computations can be reduced. By placing the
-pivot row as the first row in the matrix, it is only required to compute the
-address once for the first element of the matrix, and then every subsequent item
-can be indexed by incrementing the address. 
+% \section{Reduce Number of Matrix Index Computation}
+% \label{sec:optmz-get-index}
 
-% \subsection{Loop unrolling}
+% Section \ref{sec:mat-structure} discussed the benefits of using a single
+% \texttt{std::vector} to represent a matrix. Given an arbitrary row and column,
+% the item of the matrix can be found in the array by computing the index:
+% \texttt{column\char`_count * row + column}. 
+% By placing the pivot row as the
+% first row in the matrix (Figure \ref{pivot-row-first}), it is only required to
+% compute the address once for the first element of the matrix, and then every
+% subsequent item can be indexed by address increments. 
+
+
+% % The matrix data structure can be further
+% % optimized if the number of index computations can be reduced.
+
+
+
+% \begin{table}[H]
+% \begin{minipage}{.5\linewidth}
+% \begin{tabular}{|l|l|}
+% \hline
+% Row        & Content \\ 
+% \toprule
+% $0$    & First row of the matrix \\ 
+% \phantom{} &                         \\
+% ...        &  ...                    \\
+% \phantom{} &                         \\
+% $p-1$   & The row before pivot row  \\ 
+% \hline
+% $p$  & \tikz[baseline=(node1.base)]\node (node1)  {\textbf{Pivot row}};    \\ 
+% \hline
+% $p+1$   & The row after pivot row  \\ 
+% \phantom{} &                         \\
+% ...        &  ...                    \\
+% \phantom{} &                         \\
+% $n-1$    & Last row of the matrix \\ 
+% \hline
+% \end{tabular}
+
+% \end{minipage}%
+% \begin{minipage}{.5\linewidth}
+
+% \begin{tabular}{|l|l|}
+% \hline
+% Row        & Content \\ 
+% \toprule
+% $0$  &   \tikz[baseline=(node2.base)]\node (node2) {\textbf{Pivot row}};  \\ 
+% \hline
+% $1$        & First row of the matrix \\ 
+% \phantom{} &                         \\
+% ...        &  ...                    \\
+% \phantom{} &                         \\
+% $p-1$   & The row before pivot row  \\ 
+% $p$   & The row after pivot row  \\ 
+% \phantom{} &                         \\
+% ...        &  ...                    \\
+% \phantom{} &                         \\
+% $n-1$    & Last row of the matrix \\ 
+% \hline
+% \end{tabular}
+% \end{minipage} 
+
+% % \begin{tikzpicture}[remember picture,overlay]
+%     % % Bend above text line
+%     % \draw[-latex] (node2.south) -- ++(0,-1.5ex) -| (node1.south);
+%     % % \draw[-latex] (node2.north) to[bend right] (node1.north);
+% % \end{tikzpicture}
+
+% \caption{The tables highlight the difference between two different approaches in
+% arranging rows of a $n$-row matrix in the memory. The left-hand-side presents
+% the structure of the matrix by default, while the matrix on the right is derived
+% by moving the pivot row to the first row of the matrix.}
+% \label{pivot-row-first}
+% \end{table}
 
 
 
 \section{Column Size Specialization}
 \label{sec:ColumnSizeSpecialization}
-Figure \ref{small-val-low-dim} shows that 95\% of the matrices have less
-than 20 columns while 75\% of the matrices have more than 18
-columns~\cite{FPL1}. Therefore, a matrix of 19 columns is most likely to be encountered. 
 
-A \ymm{} register can pack 8 \dtfloat{}, and a \zmm{}
-register can pack 16 \dtfloat{} (Figure \ref{archtable}). When padding each row
-of the 19-column matrix to 32 columns to fit in 2 \zmm{} registers, 13 \dtfloat{}
-are wasted. Alternatively, the rows can be padded to 24 columns using 3 \ymm{}
-registers, reducing the padding waste to 5 \dtfloat{}.
+A single \zmm{} vector can accommodate up to 16 \dtfloat{} values, while two of
+them can store 32 \dtfloat{} values. However, loading a row into two \zmm{}
+vectors can result in a minimum waste of 12 \dtfloat{} values for 95\% of
+matrices containing 20 columns or less, as indicated in Figure
+\ref{small-val-low-dim}. Alternatively, rows can be into loaded into multiple
+\ymm{} vectors, which can accommodate 8 \dtfloat{} values each. For the majority
+of cases, 3 \ymm{} vectors can sufficiently cover the aforementioned 95\% of
+matrices with substantially less waste. Since \ymm{} registers have double the
+amount of execution units than \zmm{}, and the instruction count is anticipated
+to be only 50\% greater, the use of a 3 \ymm{} setup for a row is expected to
+outperform the 2 \zmm{} approach. Benchmark plotted in the Figure
+\ref{fig:3ymm-4ymm-2zmm} demonstrates that the 3 \ymm{} setup for a row is 15\%
+faster then the 2 \zmm{} configuration, which matches the expectation.
 
-Since \ymm{} registers have double the amount of execution units than \zmm{}
-registers, while there will be only 50\% more instruction count, the 3 \ymm{}
-setup is expected to be faster than the more generic configuration of 32 columns
-and 2 \zmm{} registers. 
+\begin{figure}[H]
+    \begin{center}
+        \includegraphics[width=\linewidth]{image/3ymm-4ymm-2zmm.png}
+    \end{center}
+    \caption{This benchmark of the \pivot{} function measures the difference in
+    performance when rows are packed into 3 \ymm{} vectors, 4 \ymm{} vectors or 2 \zmm{}
+    vectors. Apart from them 3 \ymm{} setup is the fastest, It is also worth noting
+    that the performance of the 4 \ymm{} implementation is consistently 1.4 ns
+    slower than its \zmm{} counterpart. This confirms with Zen 4's performance
+    in Section \ref{sec:avx512} that equal amount of workload compiled to
+    AVX-512 instructions is faster than AVX-2, due to less front-end pressure.  
+    }
+    \label{fig:3ymm-4ymm-2zmm}
+\end{figure}
+
+
+
+
+
+
 
 
 \section{Evaluation}
 \begin{figure}[H]
     \begin{center}
-        \includegraphics[width=\linewidth]{image/specialize-i16-f32-v2.png}
+        \includegraphics[width=\linewidth]{image/i16-3ymmf32-upstream-overflow.png}
         % \includegraphics[width=50mm]{image/turtle.png}
     \end{center}
-    \caption{ A benchmark of the \pivot{} function.
-    All implementations using \zmm{} require padding column size to 32.
-    However, the combination of \dtfloat{} and \ymm{} allows some flexibility
-    in padding size. 
-    In cases where the column size is less than 24, instead of padding to 32, 
-    the column size is padded to 24, and three \ymm{} registers are allocated for each row.
-    This approach has been found to be 15\% faster than its \zmm{} counterpart.
+    \caption{ 114514
     }
-    \label{fig:specialization}
+    % \caption{ A benchmark of the \pivot{} function.
+    % All implementations using \zmm{} require padding column size to 32.
+    % However, the combination of \dtfloat{} and \ymm{} allows some flexibility
+    % in padding size. 
+    % In cases where the column size is less than 24, instead of padding to 32, 
+    % the column size is padded to 24, and three \ymm{} registers are allocated for each row.
+    % This approach has been found to be 15\% faster than its \zmm{} counterpart.
+    % }
+    \label{fig:i16-3ymmf32-upstream-overflow}
 \end{figure}
+
 
 By integrating the aforementioned optimizations and running a benchmark (Figure
 \ref{fig:specialization}) for the \pivot{} function, it is discovered that:
@@ -1940,6 +2070,15 @@ By integrating the aforementioned optimizations and running a benchmark (Figure
 % Additionally, \dtfloat{} offers substantial compatibility advantage
 % over \dtshort{} for vast amount of non-AVX-512 platforms. 
 
+\chapter{Related Work}
+\begin{enumerate}
+    \item mlir
+    \item ISL
+    \item fpl
+    \item cache modeling paper
+    \item floating point GPU arithmetic papers 1
+    \item floating point GPU arithmetic papers 2
+\end{enumerate}
 
 \chapter{Conclusion and Future Work}
 
