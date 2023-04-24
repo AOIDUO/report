@@ -18,7 +18,7 @@
 \usepackage{tikz}
 
 \newcommand{\sigfpe}{\texttt{SIGFPE}}
-\newcommand{\dthalfi}{\texttt{int10\char`_t}}
+\newcommand{\dthalfi}{\texttt{int11\char`_t}}
 \newcommand{\dtshort}{\texttt{int16\char`_t}}
 \newcommand{\dtint}{\texttt{int32\char`_t}}
 \newcommand{\dtlong}{\texttt{int64\char`_t}}
@@ -1416,9 +1416,9 @@ In conclusion, this report presents a fast implementation of the \pivot{} functi
     automatic overflow detection.
 \end{enumerate}
 
-I achieved 20 times speedup over the upstream implementation, but unfortunately, it is about 20\% slower than the FPL's approach. Nevertheless, my method offers better compatibility. The FPL's approach requires AVX-512, but mine works on old and vastly more common AVX-2 CPUs.
+This report achieved 20 times speedup over the upstream implementation, but unfortunately, it is about 20\% slower than the FPL's approach. Nevertheless, my method offers better compatibility. The FPL's approach requires AVX-512, but mine works on old and vastly more common AVX-2 CPUs.
 
-My techniques of optimizing the \texttt{pivot} function could make further progress with the 16-bit floating point data type \dthalf{}. It consists of a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI applications where high precision is not needed, \dthalf{} provides performance benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}. It has been supported natively on GPUs since 2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future AVX extensions, it would potentially further improve the performance of \pivot{}. The \dthalfi{} data type can be defined using the 10-bit mantissa, which covers 99\% of the elements in the constraint matrices~\cite{FPL1}. It is expected to improve the runtime of the \pivot{} function by 2 times if \dtfloati{} is replaced with \dthalfi{}.
+The techniques of optimizing the \texttt{pivot} function could make further progress with the 16-bit floating point data type \dthalf{}. It consists of a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa (Figure \ref{fig:ieee-f16}). For some AI applications where high precision is not needed, \dthalf{} provides performance benefits over \dtfloat{} and \dtdouble{}~\cite{fp16-fast}. It has been supported natively on GPUs since 2016~\cite{pascal-intro-fp16}, and if this data type is integrated into future AVX extensions, it would potentially further improve the performance of \pivot{}. The \dthalfi{} data type can be defined using the sign bit and the 10-bit mantissa, which covers 99\% of the elements in the constraint matrices~\cite{FPL1}. By using \dthalfi{}, it is expected that the runtime of the \pivot{} function can be reduced by 50\% compared to the \dtfloati{} version.
 
 
 \begin{figure}[H]
