@@ -205,8 +205,8 @@ Computer Science}}
 \DeclareOption{12pt}{\renewcommand{\@thesispoints}{12pt}}
 
 %% Font options.
-%\DeclareOption{notimes}{\setboolean{timesfonts}{false}}
-%\DeclareOption{timesfonts}{\setboolean{timesfonts}{true}}
+\DeclareOption{notimes}{\setboolean{timesfonts}{false}}
+\DeclareOption{timesfonts}{\setboolean{timesfonts}{true}}
 
 %% Whether it's a draft (if so, single space and wider margins to fit more)
 \DeclareOption{draft}{

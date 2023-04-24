@@ -176,7 +176,7 @@ To propose a faster alternative to the \texttt{pivot} function, we could conside
 
 \begin{enumerate}
 
-\item Utilize SIMD: preliminary benchmark (Section \ref{sec:vectorization-method-eval}) indicates at least 10 times
+\item Utilize SIMD: preliminary benchmark (Section \ref{sec:vectorization-method-eval}) indicates a 20 times
 performance improvement. 
 
 \item Use small bit width for every element: reducing the bit width by half doubles the amount of elements packed into a single vector register and essentially reduces the instruction count by half (Table \ref{archtable}). 
@@ -600,7 +600,7 @@ The \pivot{} function does multiply and add for each row in the matrix; therefor
 \section{Vectorization Method}
 \label{sec:vectorization-method}
 \subsection{Clang's Automatic Vectorization}
-Clang can generate vectorized instructions from scalar source code, using the flags \texttt{-O3 -march=native} on a platform with vector ISA enabled. Starting with an example (Listing \ref{vec-add-float-auto}), the simple \texttt{vec\char`_add} function adds every element from two arrays and saves it to the third. 
+Clang can generate vectorized instructions from scalar source code, using the flags \texttt{-O3 -march=native} on a platform with vector ISA enabled. Starting with an example (Listing \ref{vec-add-float-auto}), the simple \texttt{vec\char`_mul\char`_add} function multiplies every element from two arrays, adds the product with the third, and saves it to the destination array. 
 
 \begin{table}[ht]\captionsetup{name=Listing}
 %\captionsetup{justification=centering}
@@ -609,9 +609,10 @@ Clang can generate vectorized instructions from scalar source code, using the fl
     \midrule
     \begin{VerbatimCompact}
 #define size 128
-void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
+void vec_mul_add(int* src1_ptr, int* src2_ptr, 
+                 int* src3_ptr, int* dst_ptr) {
     for (uint32_t i = 0; i < size; i += 1 ){
-        dst_ptr[i] = src1_ptr[i] + src2_ptr[i];
+        dst_ptr[i] = src1_ptr[i] * src2_ptr[i] + src3_ptr[i];
     }
 }
     \end{VerbatimCompact}
@@ -620,37 +621,39 @@ void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
     Assembly snippet, vectorization on\\
     \midrule
     \begin{VerbatimCompact}
-1458: c4 c1 7c 58 84 87 20 vaddps -0x1e0(%r15,%rax,4),%zmm0,%zmm0
-145f: fe ff ff
-1462: c4 c1 74 58 8c 87 40 vaddps -0x1a0(%r15,%rax,4),%zmm1,%zmm1
-1469: fe ff ff
+vmovdqu64   (%rsi,%rax,4),%zmm0
+vmovdqu64   0x40(%rsi,%rax,4),%zmm1
+vpmulld     (%rdi,%rax,4),%zmm0,%zmm0
+vpmulld     0x40(%rdi,%rax,4),%zmm1,%zmm1
+vpaddd      (%rdx,%rax,4),%zmm0,%zmm0
+vpaddd      0x40(%rdx,%rax,4),%zmm1,%zmm1
+vmovdqu64   %zmm0,(%rcx,%rax,4)
+vmovdqu64   %zmm1,0x40(%rcx,%rax,4)
     \end{VerbatimCompact}
     \\
     Assembly snippet, vectorization off\\
     \midrule
     \begin{VerbatimCompact}
-120d: d8 44 82 04    fadds  0x4(%rdx,%rax,4)
-1211: d9 5c 81 04    fstps  0x4(%rcx,%rax,4)
-1215: d9 44 86 08    flds   0x8(%rsi,%rax,4)
+mov    (%rsi,%rax,4),%r8d
+imul   (%rdi,%rax,4),%r8d
+add    (%rdx,%rax,4),%r8d
+mov    %r8d,(%rcx,%rax,4)
     \end{VerbatimCompact}
 \end{tabular}
 \caption{The vectorized binary and scalar binary is derived by compiling with flags
 \texttt{-O3 -march=native} and \texttt{-O3 -march=native -mno-avx -mno-sse}
-respectively, targeting the micro-architecture Zen 4 with \texttt{clang-15}.}
+respectively, targeting the micro-architecture Zen 4 with \texttt{clang-17}.}
 \label{vec-add-float-auto}
 \end{table}
 % \hl{TODO: these hex code are actually incorrect, I assume this does not really matter?}
 
 After compiling on a AVX-512 enabled Zen 4 computer and disassembling the
-binary, it is observed that Clang automatically packs 16 \dtfloat{} into a \zmm{}
-register as an operand of the \texttt{vaddps} instruction. 
+binary, it is observed that Clang automatically packs 16 \dtint{} into a \zmm{}
+register as an operand of the \texttt{vpmulld}\footnote{Vector \dtint{} multiplication} and \texttt{vpaddd}\footnote{Vector \dtint{} addition} instructions. 
 
 Alternatively, vectorization could be disabled by adding the \texttt{-mno-avx
--mno-sse} flags on top of \texttt{-O3 -march=native}. These two sets of flags
-guarantee that the binary will be equally optimized, with the only difference being whether vector instructions are generated or not. In this case, 
-scalar instructions \texttt{fadds}, \texttt{fstps}, and \texttt{flds} are
-selected.
-
+-mno-sse} flags on top of \texttt{-O3 -march=native}. These two flags
+guarantee that the binary will be equally optimized, with the only difference being whether vector instructions are generated or not. In this case, scalar instructions \texttt{imul}\texttt{vpaddd} and \texttt{add} are selected.
 
 \subsection{Clang's Vector Data Type}
 
@@ -672,7 +675,7 @@ defines a 512-bit \zmm{} vector type named \texttt{int16x32}, consisting of 32
 After defining a vector data type, a vector variable can be created by casting
 from a pointer of the target array. Then arithmetic operators can be applied
 between the vectors to perform element-wise operations. The previous
-\texttt{vec\char`_add} example can be rewritten as the code snippet shown in Listing
+\texttt{vec\char`_mul\char`_add} example can be rewritten as the code snippet shown in Listing
 \ref{vec-add-float-vecty}:
 
 \begin{table}[ht]\captionsetup{name=Listing}
@@ -682,12 +685,14 @@ between the vectors to perform element-wise operations. The previous
     \midrule
     \begin{VerbatimCompact}
 #define size 128
-typedef float floatZmm __attribute__((ext_vector_type(16)));
-void vec_add(float* src1_ptr, float* src2_ptr, float* dst_ptr) {
+typedef int intZmm __attribute__((ext_vector_type(16)));
+void vec_mul_add(int* src1_ptr, int* src2_ptr, 
+                 int* src3_ptr, int* dst_ptr) {
     for (uint32_t i = 0; i < size; i += VecSize){
-        floatZmm src1Vec = *(floatZmm *)(src1_ptr + i);
-        floatZmm src2Vec = *(floatZmm *)(src2_ptr + i);
-        *(floatZmm *)(dst_ptr + i) = src1Vec + src2Vec;
+        intZmm src1Vec = *(intZmm *)(src1_ptr + i);
+        intZmm src2Vec = *(intZmm *)(src2_ptr + i);
+        intZmm src3Vec = *(intZmm *)(src3_ptr + i);
+        *(int *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
     }
 }
 \end{VerbatimCompact}
@@ -699,121 +704,14 @@ coding with vector types is slightly more complicated.}
 \subsection{Evaluation}
 
 \label{sec:vectorization-method-eval}
-When comparing the performance of code written with and without the vector type
-and examining their assembly, it has been discovered that the automatic
-vectorization feature in Clang can be unpredictable and may lead to undesired
-behaviors. It operates as a black box and may take much effort to understand
-its mechanisms. One of the issues is that Clang may select a suboptimal vector
-width.
+When comparing the performance of code written with and without the vector type and examining their assembly, it has been discovered that the automatic vectorization feature in Clang can be unpredictable and may lead to undesired behaviors. It operates as a black box and may take much effort to understand its mechanisms. 
 
-Consider the \texttt{vec\char`_fma} function in Listing \ref{table:vec-fma-float}, a
-slightly more complicated version of the previous \texttt{vec\char`_add} example,
-where there are 3 input matrices and the element-wise operation is changed from
-add to FMA. The disassembly reveals that Clang decides to use the FMA vector
-instructions of 128-bit width. However, when vector size is constrained to a bigger
-width by defining a vector type, a more optimal binary can be generated. Benchmark
-(Figure \ref{plot_vectorization_method}) shows that the vector type version is 6
-times and 11 times faster than the automatic vectorization and vectorization
-disabled versions, respectively.
+Consider the \texttt{mat\char`_mul\char`_add} function in Listing \ref{table:vec-fma-float}, a slightly more complicated version of the previous \texttt{vec\char`_mul\char`_add} example, where the 3 input arrays and the output array are replaced with matrics. The \texttt{matrix<int>} data type provides getters and setters to read and write each element, as well as a function to get the pointer. The disassembly reveals that Clang fails to recognize vectorization patterns through getter and setter functions. It decides to dispatch scalar instructions for addition (\texttt{add}) and multiplication (\texttt{imul}) entirely.
+The vectorized equivalency instructions \texttt{vpaddd} and \texttt{vpmulld} 
+can be obtained by writing source code using vector types, and it is
+is 21 times more performant (Figure \ref{plot_vectorization_method}).
 
 \begin{table}[H]\captionsetup{name=Listing}
-%\captionsetup{justification=centering}
-\begin{tabular}{>{\raggedright\arraybackslash}p{13cm}}
-    Scalar source code to be automatically vectorized by Clang\\
-    \midrule
-    \begin{VerbatimCompact}
-void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
-             matrix<float> & mat_src3, matrix<float> & mat_dst) {
-    for (int i = 0; i < row; i += 1) {
-        for (int j = 0; j < col; j += 1) {
-            float src1 = mat_src1.get(i,j);
-            float src2 = ...
-            mat_dst.set(i,j,  (src1 * src2) + src3);
-        }
-    }
-}
-    \end{VerbatimCompact}
-    \\
-    % \toprule
-    Assembly snippet of the hot loop\\
-    \midrule
-    \begin{VerbatimCompact}
-vmovss (%rdx,%rsi,4),%xmm0
-vmovss (%rcx,%rax,4),%xmm1
-vfmadd213ss (%r8,%rdi,4),%xmm0,%xmm1
-vmovss %xmm1,(%r9,%rax,4)
-    \end{VerbatimCompact}
-\\
-% \end{tabular}
-% \caption{}
-% \label{table:vec-fma-float-auto}
-% \end{table}
-
-% \begin{table}[H]\captionsetup{name=Listing}
-% \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-    Source code written with Clang's vector type\\
-    \midrule
-    \begin{VerbatimCompact}
-typedef float floatZmm __attribute__((ext_vector_type(16)));
-void vec_fma(matrix<float> & mat_src1, matrix<float> & mat_src2, 
-             matrix<float> & mat_src3, matrix<float> & mat_dst) {
-    float * src1_ptr = (float *) mat_src1.getItemPointer(0,0);
-    float * src2_ptr = ...
-    for (uint32_t i = 0; i < row * col; i += 16){
-        floatZmm src1Vec = *(floatZmm *)(src1_ptr + i);
-        floatZmm src2Vec = ...
-        *(floatZmm *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
-    }
-}
-    \end{VerbatimCompact}
-    \\
-    % \toprule
-    Assembly snippet of the hot loop\\
-    \midrule
-    \begin{VerbatimCompact}
-vmovups (%rax,%r8,4),%zmm0
-vmovups (%rcx,%r8,4),%zmm1
-vfmadd213ps (%rsi,%r8,4),%zmm0,%zmm1
-vmovups %zmm1,(%rdi,%r8,4)
-    \end{VerbatimCompact}
-    \\
-\end{tabular}
-\caption{The toy example performs vectorized fused-multiply-add operation on
-every item from 3 input matrices and saves the result to the output matrix. The
-internal data structure of \texttt{matrix} is \texttt{std::vector}, and its
-member function \texttt{getItemPointer(r,c)} returns the pointer to the element
-at row \texttt{r} and column \texttt{c}. The key distinction between the two
-vectorization approaches is the register types. \texttt{XMM} are 128-bit
-registers, while \zmm{} are 512-bit long.}
-\label{table:vec-fma-float}
-\end{table}
-
-
-In some cases, Clang could be even worse. It may fail to recognize vectorization
-patterns from element-wise loop operations, leading to more reduction in
-performance. In the \texttt{vec\char`_fma} example, by changing the type signature
-from \dtfloat{} to \texttt{int}, Clang decides to dispatch scalar instructions
-for addition (\texttt{add}) and multiplication (\texttt{imul}) entirely
-(Listing \ref{vec-fma-int}). Their vectorized equivalency \texttt{vpaddd} and
-\texttt{vpmulld} is 15 times more performant (Figure
-\ref{plot_vectorization_method}).
-
-\begin{figure}[H]%\captionsetup{name=Figure}
-    %\captionsetup{justification=centering}
-    \begin{center}
-    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
-    \end{center}
-    \caption{A benchmark for the element-wise multiply-add toy example on 16
-        by 16 matrices with different vectorization techniques. The toy example
-        written with vector types is 5 to 10 times faster than their
-        automatically vectorized or scalar counterpart. 
-    % Also, \dtfloat{}
-    % is always faster than \dtint{}, because it benefits from fused-multiply-add.
-    }
-    \label{plot_vectorization_method}
-\end{figure}
-
-    \begin{table}[H]\captionsetup{name=Listing}
 %\captionsetup{justification=centering}
 \begin{tabular}{>{\raggedright\arraybackslash}p{13cm}}
     Scalar source code to be automatically vectorized by Clang\\
@@ -835,23 +733,13 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-mov    0x1c(%rcx),%r13d
-mov    0x1c(%rdx),%r12d
-imul   %r14d,%r13d
-imul   %r14d,%r12d
-add    %r15d,%r13d
-add    %r15d,%r12d
+mov    (%rsi,%rax,4),%r8d
+imul   (%rdi,%rax,4),%r8d
+add    (%rdx,%rax,4),%r8d
+mov    %r8d,(%rcx,%rax,4)
     \end{VerbatimCompact}
-    \\
-% \end{tabular}
-% \caption{}
-% \label{vec-fma-int-auto}
-% \end{table}
-
-% \begin{table}[H]\captionsetup{name=Listing}
-% \begin{tabular}{>{\raggedright\arraybackslash}p{14cm}}
-
-    Vectorized source code using Clang's vector type extension\\
+\\
+    Source code written with Clang's vector type\\
     \midrule
     \begin{VerbatimCompact}
 typedef int intZmm __attribute__((ext_vector_type(16)));
@@ -861,8 +749,7 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     int * src2_ptr = ...
     for (uint32_t i = 0; i < row * col; i += 16){
         intZmm src1Vec = *(intZmm *)(src1_ptr + i);
-        intZmm src2Vec = *(intZmm *)(src2_ptr + i);
-        intZmm src3Vec = *(intZmm *)(src3_ptr + i);
+        intZmm src2Vec = ...
         *(intZmm *)(dst_ptr + i) = src1Vec * src2Vec + src3Vec;
     }
 }
@@ -872,20 +759,29 @@ void vec_fma(matrix<int> & mat_src1, matrix<int> & mat_src2,
     Assembly snippet of the hot loop\\
     \midrule
     \begin{VerbatimCompact}
-vmovdqu64 (%rcx,%r8,4),%zmm0
-vpmulld (%rax,%r8,4),%zmm0,%zmm0
-vpaddd (%rsi,%r8,4),%zmm0,%zmm0
-vmovdqu64 %zmm0,(%rdi,%r8,4)
+vmovdqu64   (%rsi,%rax,4),%zmm0
+vmovdqu64   0x40(%rsi,%rax,4),%zmm1
+vpmulld     (%rdi,%rax,4),%zmm0,%zmm0
+vpmulld     0x40(%rdi,%rax,4),%zmm1,%zmm1
+vpaddd      (%rdx,%rax,4),%zmm0,%zmm0
+vpaddd      0x40(%rdx,%rax,4),%zmm1,%zmm1
+vmovdqu64   %zmm0,(%rcx,%rax,4)
+vmovdqu64   %zmm1,0x40(%rcx,%rax,4)
     \end{VerbatimCompact}
     \\
 \end{tabular}
-\caption{Comparing to the source code from Listing \ref{table:vec-fma-float}, the
-only change is replacing \dtfloat{} with \texttt{int}. Clang fails to vectorize the
-scalar version, but vectorization is still successful with vector types. }
-\label{vec-fma-int}
+\caption{The toy example performs vectorized multiply-add operation on every item from 3 input matrices and saves the result to the output matrix. }
+\label{table:vec-fma-float}
 \end{table}
 
-
+\begin{figure}[H]%\captionsetup{name=Figure}
+    %\captionsetup{justification=centering}
+    \begin{center}
+    \includegraphics[width=\linewidth]{image/plot_vectorization_method.png}
+    \end{center}
+    \caption{The vectorization pattern for the scalar source code Listing \ref{table:vec-fma-float} is not recognized by Clang, making it 21 times slower than the version written using vector types. }
+    \label{plot_vectorization_method}
+\end{figure}
 
 
 
@@ -1353,7 +1249,7 @@ While making a copy of the input matrix (Figure \ref{fig:single-buffering}) is a
 The concept of memory alignment ensures that the starting address of each piece of data is a multiple of its size. When accessing memory, the CPU retrieves data from the main memory or cache in the unit of ``cache line'', and the cache lines are aligned. Aligning the matrix to the size of vector registers guarantees that every vector is fitted inside a single cache line. Otherwise, a vector register might be spitted on two cache lines, so the CPU must request both cache lines and shift to extract the desired vector~\cite{Unaligned}. A simple example is provided by Figure \ref{fig:cacheline}.
 
 
-In the Listing \ref{table:vec-fma-float} and Listing \ref{vec-fma-int}, the assembly for load and store are \texttt{vmovups} and \texttt{vmovdqu64}. \texttt{vmovups} for ``Move Unaligned Packed Single-Precision Floating-Point Values'', and \texttt{vmovdqu64} for ``Move Unaligned Packed Integer Values''~\cite{instruction}. This indicates that the load operation are unaligned and may negatively impact performances~\cite{Unaligned}. To address this issue, an aligned allocator is given to the constructor of \texttt{std::vector} when creating a matrix as follows, where the \texttt{AlignedAllocator} is provided by the \dtshort{} implementation from the FPL paper~\cite{FPL2}:
+In the Listing \ref{table:vec-fma-float}, the assembly for load and store is \texttt{vmovdqu64}, for ``Move Unaligned Packed Integer Values''~\cite{instruction}. This indicates that the load operation are unaligned and may negatively impact performances~\cite{Unaligned}. To address this issue, an aligned allocator is given to the constructor of \texttt{std::vector} when creating a matrix as follows, where the \texttt{AlignedAllocator} is provided by the \dtshort{} implementation from the FPL paper~\cite{FPL2}:
 
 \begin{VerbatimCompact}
 template <typename T>
@@ -1363,7 +1259,7 @@ public:
   // ...
 }
 \end{VerbatimCompact}
-Loading from an aligned address can be noticed by the compiler, then aligned load instructions \texttt{vmovdqa} or \texttt{vmovaps} will be selected accordingly. 
+Loading from an aligned address can be noticed by the compiler, then aligned load instructions \texttt{vmovdqa} for integers or \texttt{vmovaps} for floating points will be selected accordingly. 
 
 \begin{figure} [H]
     \begin{center}
